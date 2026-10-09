@@ -62,4 +62,15 @@
     <string name="voice_label">🎙️ Message vocal</string>
     <string name="mic_denied">Le micro est nécessaire pour parler à Yamy. Tu peux l\'autoriser dans les réglages.</string>
     <string name="agents">🤝 Agents</string>
+    <string name="remember">📝 Retenir</string>
+    <string name="scribe_working">📝 Le Scribe relit la discussion…</string>
+    <string name="scribe_nothing">📝 Rien de nouveau à retenir.</string>
+    <string name="scribe_done">📝 Yamy a noté : %1$s</string>
+    <string name="ok">OK</string>
+    <string name="memory_intro">Ce que Yamy retient de vous, en notes reliées. Tout est chiffré sur ce téléphone : lis, corrige ou supprime ce que tu veux.</string>
+    <string name="memory_empty">Aucune note pour l\'instant. Dans une discussion, touche « 📝 Retenir ».</string>
+    <string name="forget_all">Tout oublier</string>
+    <string name="memory_summary">Résumé (une ligne)</string>
+    <string name="memory_content">Contenu (liens : [[nom]])</string>
+    <string name="links_label">Liée à : %1$s</string>
 </resources>

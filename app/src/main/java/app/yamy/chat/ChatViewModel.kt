@@ -17,6 +17,10 @@ import app.yamy.agents.AgentStep
 import app.yamy.agents.Chain
 import app.yamy.agents.ChainFormat
 import app.yamy.agents.ChainRunner
+import app.yamy.memory.MemoryFormat
+import app.yamy.memory.MemoryRepository
+import app.yamy.memory.Scribe
+import app.yamy.memory.ScribeResult
 import app.yamy.vision.ImageSource
 import app.yamy.voice.SegmenterEvent
 import app.yamy.voice.Speaker
@@ -45,6 +49,9 @@ import kotlinx.coroutines.withContext
 enum class EngineStatus { LOADING, READY, LISTENING, GENERATING, MODEL_MISSING, ERROR }
 
 /** Écoute en cours : niveaux récents pour l'onde, durée, et texte déjà transcrit. */
+/** Passage du Scribe : [working] pendant la relecture, puis les notes écrites. */
+data class ScribeUi(val working: Boolean, val result: ScribeResult? = null)
+
 /** Chaîne d'agents en cours (ou terminée, jusqu'à ce que son résumé arrive de la base). */
 data class ChainRunUi(val steps: List<AgentStep>, val summary: String? = null)
 
@@ -77,6 +84,8 @@ class ChatViewModel(
     private val recorder: VoiceRecorder,
     private val speaker: Speaker,
     private val chainRunner: ChainRunner,
+    private val memory: MemoryRepository,
+    private val scribe: Scribe,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -87,6 +96,10 @@ class ChatViewModel(
     private val currentSession = MutableStateFlow<Session?>(null)
     private val voice = MutableStateFlow<VoiceUi?>(null)
     private val chainRun = MutableStateFlow<ChainRunUi?>(null)
+    private val _scribe = MutableStateFlow<ScribeUi?>(null)
+
+    /** Passage du Scribe : en cours, ou terminé avec les notes écrites (annulable). */
+    val scribeState: StateFlow<ScribeUi?> = _scribe
     private val _chains = MutableStateFlow<List<Chain>>(emptyList())
 
     /** Chaînes d'agents disponibles (livrées avec l'app ou créées par la personne). */
@@ -102,6 +115,11 @@ class ChatViewModel(
 
     /** Sérialise les opérations qui touchent à la conversation du moteur (envoi, effacement, reprise). */
     private val conversationLock = Mutex()
+    private var notesAvailable = false
+
+    /** Discussion dont le contexte est chargé dans le moteur : un tour la recharge si elle a changé. */
+    private var conversationSessionId: Long? = null
+    private var memoryIndex = ""
     private var generation: Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -141,10 +159,25 @@ class ChatViewModel(
         val (prompt, available) = withContext(Dispatchers.IO) {
             val all = skills.list()
             _chains.value = all.mapNotNull { ChainFormat.parse(it) }
-            val base = persona.systemPrompt() + session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty()
+            notesAvailable = memory.list().let { notes ->
+                memoryIndex = MemoryFormat.index(notes)
+                notes.isNotEmpty()
+            }
+            val base = persona.systemPrompt() +
+                session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty() +
+                memoryIndex.takeIf { it.isNotBlank() }?.let {
+                    "\n\n## Ce que tu sais déjà de la personne (tes notes)\n$it\n" +
+                        "Si un détail t'aide à répondre, appelle l'outil lireNote avec le nom de la note. N'invente rien au-delà."
+                }.orEmpty()
             SkillPrompt.withSkills(base, all) to all
         }
-        engine.startConversation(prompt, history, skills.takeIf { available.isNotEmpty() })
+        engine.startConversation(
+            prompt,
+            history,
+            skills.takeIf { available.any { !it.isChain } },
+            memory.takeIf { notesAvailable },
+        )
+        conversationSessionId = session.id
     }
 
     /** Prépare une photo choisie (galerie ou appareil) pour le prochain message. */
@@ -210,6 +243,8 @@ class ChatViewModel(
             try {
                 var last = emptyList<AgentStep>()
                 conversationLock.withLock {
+                    // La chaîne utilise des générations ponctuelles : la conversation devra être rechargée ensuite.
+                    conversationSessionId = null
                     chainRunner.run(chain, request, image?.bytes).collect { steps ->
                         last = steps
                         chainRun.value = ChainRunUi(steps)
@@ -291,6 +326,44 @@ class ChatViewModel(
         }
     }
 
+    /** Le Scribe relit la discussion courante et met à jour les notes de mémoire. */
+    fun rememberSession() {
+        if (status.value != EngineStatus.READY) return
+        val session = currentSession.value ?: return
+        generation = viewModelScope.launch {
+            status.value = EngineStatus.GENERATING
+            _scribe.value = ScribeUi(working = true)
+            try {
+                val result = conversationLock.withLock {
+                    conversationSessionId = null
+                    scribe.remember(repository.recent(session.id, SCRIBE_MESSAGES))
+                }
+                _scribe.value = ScribeUi(working = false, result = result)
+                status.value = EngineStatus.READY
+            } catch (e: CancellationException) {
+                _scribe.value = null
+                throw e
+            } catch (e: Throwable) {
+                _scribe.value = null
+                recoverFromTurnError(e)
+            }
+        }
+    }
+
+    /** Annule le dernier passage du Scribe. */
+    fun undoRemember() {
+        val result = _scribe.value?.result ?: return
+        _scribe.value = null
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { scribe.undo(result) }
+            engine.invalidateConversation()
+        }
+    }
+
+    fun dismissScribe() {
+        _scribe.value = null
+    }
+
     /** Termine l'écoute : le dernier morceau est transcrit puis envoyé. */
     fun stopListening() = recorder.stop()
 
@@ -329,7 +402,7 @@ class ChatViewModel(
             val reply = StringBuilder()
             try {
                 conversationLock.withLock {
-                    if (!engine.hasConversation) restartConversation()
+                    ensureConversationFor(session)
                     val input = ChatInput(textForModel, listOfNotNull(image?.bytes))
                     engine.send(input).collect { piece ->
                         reply.append(piece)
@@ -356,15 +429,12 @@ class ChatViewModel(
      * Ne peut pas être annulé en cours de route.
      */
     fun wipeAll(onDone: () -> Unit) {
-        voiceJob?.cancel()
-        speaker.stop()
-        val running = generation
         viewModelScope.launch(NonCancellable) {
-            running?.cancelAndJoin()
+            stopActivity()
             conversationLock.withLock {
-                pendingImage.value = null
-                draft.value = ""
-                error.value = null
+                resetScreenState()
+                memoryIndex = ""
+                conversationSessionId = null
                 wiper.wipeAll()
                 currentSession.value = sessions.mostRecentOrCreate()
             }
@@ -375,10 +445,8 @@ class ChatViewModel(
 
     /** Efface la conversation affichée et repart d'un contexte vierge. */
     fun clearConversation() {
-        voiceJob?.cancel()
-        val running = generation
         viewModelScope.launch {
-            running?.cancelAndJoin()
+            stopActivity()
             val wasUsable = status.value != EngineStatus.MODEL_MISSING && status.value != EngineStatus.LOADING
             if (wasUsable) status.value = EngineStatus.LOADING
             conversationLock.withLock {
@@ -408,6 +476,8 @@ class ChatViewModel(
     fun deleteSession(id: Long) {
         viewModelScope.launch {
             if (currentSession.value?.id == id) {
+                // Arrêter d'abord : une réponse qui se terminerait après la suppression laisserait un message orphelin.
+                stopActivity()
                 sessions.delete(id)
                 switchTo { sessions.mostRecentOrCreate() }
             } else {
@@ -417,21 +487,16 @@ class ChatViewModel(
     }
 
     private fun switchTo(onOpened: () -> Unit = {}, target: suspend () -> Session?) {
-        voiceJob?.cancel()
-        speaker.stop()
-        val running = generation
         viewModelScope.launch {
-            running?.cancelAndJoin()
+            stopActivity()
             val session = target() ?: return@launch
-            val usable = status.value == EngineStatus.READY || status.value == EngineStatus.GENERATING
-            if (usable) status.value = EngineStatus.LOADING
             conversationLock.withLock {
                 currentSession.value = session
-                chainRun.value = null
-                draft.value = ""
-                error.value = null
-                pendingImage.value = null
-                if (usable) {
+                resetScreenState()
+                // Le contexte est rechargé maintenant si le moteur est prêt, sinon au prochain tour
+                // (conversationSessionId ne correspond plus) : jamais de réponse avec une autre discussion.
+                if (status.value == EngineStatus.READY) {
+                    status.value = EngineStatus.LOADING
                     try {
                         restartConversation()
                         status.value = EngineStatus.READY
@@ -444,6 +509,28 @@ class ChatViewModel(
             }
             onOpened()
         }
+    }
+
+    /** Arrête l'écoute, la voix et la génération en cours, et attend qu'elles soient vraiment finies. */
+    private suspend fun stopActivity() {
+        speaker.stop()
+        voiceJob?.cancelAndJoin()
+        generation?.cancelAndJoin()
+    }
+
+    /** Vide tout ce que l'écran garde en mémoire vive pour la discussion courante. */
+    private fun resetScreenState() {
+        chainRun.value = null
+        voice.value = null
+        _scribe.value = null
+        draft.value = ""
+        error.value = null
+        pendingImage.value = null
+    }
+
+    /** Recharge le contexte du moteur s'il est périmé ou s'il appartient à une autre discussion. */
+    private suspend fun ensureConversationFor(session: Session) {
+        if (!engine.hasConversation || conversationSessionId != session.id) restartConversation()
     }
 
     /** Une erreur pendant un tour n'est pas fatale : on repart d'un contexte propre. */
@@ -479,6 +566,7 @@ class ChatViewModel(
         private const val HISTORY_TURNS = 20
         private const val TITLE_LENGTH = 40
         private const val LEVEL_BARS = 24
+        private const val SCRIBE_MESSAGES = 16
         private const val TRANSCRIBE_REQUEST = "Transcris cet audio."
         private const val TRANSCRIBE_PROMPT =
             "Tu es un outil de transcription. Écris uniquement, mot pour mot, ce qui est dit dans l'audio. Aucune réponse, aucun commentaire."

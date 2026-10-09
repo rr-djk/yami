@@ -12,6 +12,9 @@ import app.yamy.engine.ModelLocator
 import app.yamy.persona.AssetPersonaProvider
 import app.yamy.persona.PersonaProvider
 import app.yamy.agents.ChainCatalog
+import app.yamy.memory.FileMemoryRepository
+import app.yamy.memory.MemoryRepository
+import app.yamy.memory.Scribe
 import app.yamy.agents.ChainRunner
 import app.yamy.privacy.AppLock
 import app.yamy.privacy.DataWiper
@@ -35,6 +38,8 @@ class YamyApp : Application() {
     val skillCreator: SkillCreator by lazy { SkillCreator(engine) }
     val voiceRecorder: VoiceRecorder by lazy { VoiceRecorder() }
     val speaker: Speaker by lazy { Speaker(this) }
+    val memory: MemoryRepository by lazy { FileMemoryRepository(java.io.File(filesDir, "memoire"), secretBox) }
+    val scribe: Scribe by lazy { Scribe(engine, memory) }
     val chainRunner: ChainRunner by lazy { ChainRunner(engine) }
     val imageSource: ImageSource by lazy { ContentResolverImageSource(this) }
     val secretBox: KeystoreSecretBox by lazy { KeystoreSecretBox() }
@@ -43,7 +48,7 @@ class YamyApp : Application() {
     private val database: AppDatabase by lazy { AppDatabase.create(this, databasePassphrase()) }
     val conversations: ConversationRepository by lazy { RoomConversationRepository(database.messageDao()) }
     val sessions: SessionRepository by lazy { RoomSessionRepository(database) }
-    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir) }
+    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir, memory) { ChainCatalog.installDefaults(assets, skills) } }
 
     override fun onCreate() {
         super.onCreate()
@@ -66,6 +71,7 @@ class YamyApp : Application() {
             deleteDatabase("yamy-secure.db")
             secretBox.destroyKey()
             java.io.File(filesDir, "skills").deleteRecursively()
+            java.io.File(filesDir, "memoire").deleteRecursively()
             store.get()
         }
     }

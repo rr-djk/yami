@@ -98,6 +98,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val speaking by viewModel.speaking.collectAsState()
+    val scribe by viewModel.scribeState.collectAsState()
     var micDenied by rememberSaveable { mutableStateOf(false) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         micDenied = !granted
@@ -152,6 +153,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
+            RetroTextButton(onClick = viewModel::rememberSession, label = stringResource(R.string.remember), enabled = ui.status == EngineStatus.READY && ui.messages.isNotEmpty())
             RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
         }
         RetroRule()
@@ -192,6 +194,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
                 Text(it, color = MaterialTheme.colorScheme.error, style = TechnicalTextStyle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
         }
+        scribe?.let { ScribeBanner(it, onUndo = viewModel::undoRemember, onDismiss = viewModel::dismissScribe) }
         if (micDenied) {
             Text(stringResource(R.string.mic_denied), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp))
         }
@@ -363,5 +366,29 @@ private fun PendingImageChip(image: PendingImage, onRemove: () -> Unit) {
             )
         }
         RetroTextButton(onClick = onRemove, label = stringResource(R.string.remove_image))
+    }
+}
+
+/** Bandeau du Scribe : transparence sur ce que Yamy retient, avec Annuler. */
+@Composable
+private fun ScribeBanner(scribe: ScribeUi, onUndo: () -> Unit, onDismiss: () -> Unit) {
+    RetroCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Column(modifier = Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
+            val written = scribe.result?.written.orEmpty()
+            Text(
+                when {
+                    scribe.working -> stringResource(R.string.scribe_working)
+                    written.isEmpty() -> stringResource(R.string.scribe_nothing)
+                    else -> stringResource(R.string.scribe_done, written.joinToString(", ") { it.name })
+                },
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            if (!scribe.working) {
+                Row {
+                    if (written.isNotEmpty()) RetroTextButton(onClick = onUndo, label = stringResource(R.string.cancel))
+                    RetroTextButton(onClick = onDismiss, label = stringResource(R.string.ok))
+                }
+            }
+        }
     }
 }
