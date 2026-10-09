@@ -14,6 +14,8 @@ import com.google.ai.edge.litertlm.ToolSet
 import com.google.ai.edge.litertlm.tool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.fold
 import kotlinx.coroutines.flow.map
@@ -78,8 +80,7 @@ class LiteRtChatEngine(
 
     override fun send(input: ChatInput): Flow<String> {
         val active = checkNotNull(conversation) { "Conversation non démarrée" }
-        val parts = input.images.map<ByteArray, Content> { Content.ImageBytes(it) } + Content.Text(input.text)
-        return active.sendMessageAsync(Contents.of(parts)).map { it.toString() }.flowOn(Dispatchers.Default)
+        return active.sendMessageAsync(Contents.of(parts(input))).map { it.toString() }.flowOn(Dispatchers.Default)
     }
 
     override suspend fun complete(systemPrompt: String, userText: String): String = lifecycle.withLock {
@@ -92,6 +93,22 @@ class LiteRtChatEngine(
             }
         }
     }
+
+    override fun streamOnce(systemPrompt: String, input: ChatInput): Flow<String> = flow {
+        lifecycle.withLock {
+            val loaded = checkNotNull(engine) { "Moteur non chargé" }
+            conversation?.close()
+            conversation = null
+            loaded.createConversation(ConversationConfig(systemInstruction = Contents.of(systemPrompt))).use { oneShot ->
+                emitAll(oneShot.sendMessageAsync(Contents.of(parts(input))).map { it.toString() })
+            }
+        }
+    }.flowOn(Dispatchers.Default)
+
+    private fun parts(input: ChatInput): List<Content> =
+        input.images.map<ByteArray, Content> { Content.ImageBytes(it) } +
+            listOfNotNull<Content>(input.audio?.let { Content.AudioBytes(it) }) +
+            Content.Text(input.text)
 
     override fun close() = release()
 
@@ -110,6 +127,7 @@ class LiteRtChatEngine(
             ComputeBackend.GPU -> Backend.GPU()
         },
         visionBackend = Backend.CPU(),
+        audioBackend = Backend.CPU(),
         cacheDir = context.cacheDir.path,
     )
 }

@@ -78,7 +78,7 @@ class MainActivity : FragmentActivity() {
         var tab by rememberSaveable { mutableStateOf(Tab.SESSIONS) }
         val chat = viewModel<ChatViewModel>(
             factory = factory {
-                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions)
+                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker)
             },
         )
         if (inChat) {

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Volontairement AUCUNE permission : pas d'INTERNET (promesse de confidentialité). -->
+    <!-- Volontairement AUCUNE permission réseau : pas d'INTERNET (promesse de confidentialité). -->
+    <!-- Micro : utilisé seulement pendant que l'on parle à Yamy ; l'audio reste en mémoire. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".YamyApp"

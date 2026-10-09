@@ -20,6 +20,8 @@ import app.yamy.skills.FileSkillRepository
 import app.yamy.skills.SkillCreator
 import app.yamy.skills.SkillRepository
 import app.yamy.vision.ContentResolverImageSource
+import app.yamy.voice.Speaker
+import app.yamy.voice.VoiceRecorder
 import app.yamy.vision.ImageSource
 
 /** Racine de composition : câblage manuel des dépendances (injection par constructeur). */
@@ -29,6 +31,8 @@ class YamyApp : Application() {
     val persona: PersonaProvider by lazy { AssetPersonaProvider(this) }
     val skills: SkillRepository by lazy { FileSkillRepository(java.io.File(filesDir, "skills"), secretBox) }
     val skillCreator: SkillCreator by lazy { SkillCreator(engine) }
+    val voiceRecorder: VoiceRecorder by lazy { VoiceRecorder() }
+    val speaker: Speaker by lazy { Speaker(this) }
     val imageSource: ImageSource by lazy { ContentResolverImageSource(this) }
     val secretBox: KeystoreSecretBox by lazy { KeystoreSecretBox() }
     val appLock: AppLock by lazy { AppLock(this) }

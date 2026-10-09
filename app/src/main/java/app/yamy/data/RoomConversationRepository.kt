@@ -19,7 +19,7 @@ class RoomConversationRepository(private val dao: MessageDao) : ConversationRepo
 
     override suspend fun clearAll() = dao.deleteAll()
 
-    private fun MessageEntity.toDomain() = ChatMessage(id, sessionId, Role.valueOf(role), text, hasImage, createdAt)
+    private fun MessageEntity.toDomain() = ChatMessage(id, sessionId, Role.valueOf(role), text, hasImage, viaVoice, createdAt)
 
-    private fun ChatMessage.toEntity() = MessageEntity(id, sessionId, role.name, text, hasImage, createdAt)
+    private fun ChatMessage.toEntity() = MessageEntity(id, sessionId, role.name, text, hasImage, viaVoice, createdAt)
 }

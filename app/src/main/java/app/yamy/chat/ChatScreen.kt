@@ -1,5 +1,8 @@
 package app.yamy.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -90,6 +93,21 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
     val canAttach = ui.status == EngineStatus.READY
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val speaking by viewModel.speaking.collectAsState()
+    var micDenied by rememberSaveable { mutableStateOf(false) }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        micDenied = !granted
+        if (granted) viewModel.startListening()
+    }
+    fun startVoice() {
+        keyboard?.hide()
+        focusManager.clearFocus()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            viewModel.startListening()
+        } else {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
     val imeVisible = WindowInsets.isImeVisible
     val canSend = ui.status == EngineStatus.READY && (input.isNotBlank() || ui.pendingImage != null)
 
@@ -165,6 +183,17 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
                 Text(it, color = MaterialTheme.colorScheme.error, style = TechnicalTextStyle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
         }
+        if (micDenied) {
+            Text(stringResource(R.string.mic_denied), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp))
+        }
+        if (speaking) {
+            RetroTextButton(onClick = viewModel::stopSpeaking, label = stringResource(R.string.stop_speaking), modifier = Modifier.padding(start = 4.dp))
+        }
+        val voice = ui.voice
+        if (voice != null) {
+            ListeningPanel(voice, onFinish = viewModel::stopListening, onCancel = viewModel::cancelListening)
+            return@Column
+        }
         ui.pendingImage?.let { PendingImageChip(it, viewModel::discardImage) }
         // Clavier ouvert : on masque les boutons photo et la mention pour garder la conversation visible.
         if (!imeVisible) Row(
@@ -199,6 +228,12 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submit() }),
             )
+            val micLabel = stringResource(R.string.mic_description)
+            RetroOutlinedButton(
+                onClick = ::startVoice,
+                enabled = ui.status == EngineStatus.READY,
+                modifier = Modifier.semantics { contentDescription = micLabel },
+            ) { Text(stringResource(R.string.mic)) }
             RetroButton(onClick = ::submit, enabled = canSend) { Text(stringResource(R.string.send)) }
         }
         if (imeVisible) {
@@ -267,6 +302,9 @@ private fun MessageBubble(message: ChatMessage) {
             Column(modifier = Modifier.padding(16.dp)) {
                 if (message.hasImage) {
                     Text(stringResource(R.string.photo_label), style = MaterialTheme.typography.labelMedium)
+                }
+                if (message.viaVoice) {
+                    Text(stringResource(R.string.voice_label), style = MaterialTheme.typography.labelMedium)
                 }
                 Text(message.text, style = MaterialTheme.typography.bodyLarge)
             }

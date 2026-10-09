@@ -8,7 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
-@Database(entities = [MessageEntity::class, SessionEntity::class], version = 3, exportSchema = false)
+@Database(entities = [MessageEntity::class, SessionEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
     abstract fun sessionDao(): SessionDao
@@ -31,13 +31,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4 : marque des messages dictés au micro. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `viaVoice` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         /** Base chiffrée avec SQLCipher ; l'ancienne base en clair des versions de développement est supprimée. */
         fun create(context: Context, passphrase: ByteArray): AppDatabase {
             System.loadLibrary("sqlcipher")
             context.deleteDatabase(LEGACY_NAME)
             return Room.databaseBuilder(context, AppDatabase::class.java, NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }

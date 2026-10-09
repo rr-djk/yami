@@ -12,5 +12,6 @@ data class MessageEntity(
     val role: String,
     val text: String,
     val hasImage: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val viaVoice: Boolean = false,
     val createdAt: Long,
 )

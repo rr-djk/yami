@@ -6,8 +6,11 @@ import kotlinx.coroutines.flow.Flow
 /** Backend de calcul demandé au runtime. CPU par défaut (voir docs/MESURES.md). */
 enum class ComputeBackend { CPU, GPU }
 
-/** Message à envoyer au modèle : texte et images optionnelles (octets JPEG/PNG). */
-class ChatInput(val text: String, val images: List<ByteArray> = emptyList())
+/**
+ * Message à envoyer au modèle : texte, images optionnelles (octets JPEG/PNG) et audio optionnel
+ * (fichier WAV 16 kHz mono, 30 s maximum : limite de Gemma 4).
+ */
+class ChatInput(val text: String, val images: List<ByteArray> = emptyList(), val audio: ByteArray? = null)
 
 /** Un tour de parole déjà échangé, rejoué au moteur pour rétablir le contexte. */
 data class Turn(val fromUser: Boolean, val text: String)
@@ -44,4 +47,10 @@ interface ChatEngine : AutoCloseable {
      * (le moteur n'en gère qu'une à la fois).
      */
     suspend fun complete(systemPrompt: String, userText: String): String
+
+    /**
+     * Génération ponctuelle diffusée au fil de l'eau (ex. transcription d'un extrait vocal),
+     * hors conversation. Invalide la conversation courante, comme [complete].
+     */
+    fun streamOnce(systemPrompt: String, input: ChatInput): Flow<String>
 }
