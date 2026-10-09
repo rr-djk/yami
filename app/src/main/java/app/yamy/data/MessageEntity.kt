@@ -8,5 +8,6 @@ data class MessageEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val role: String,
     val text: String,
+    val hasImage: Boolean = false,
     val createdAt: Long,
 )

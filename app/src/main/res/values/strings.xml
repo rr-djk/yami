@@ -7,4 +7,9 @@
     <string name="send">Envoyer</string>
     <string name="clear_conversation">Effacer</string>
     <string name="model_missing">Modèle introuvable. Copie-le avec adb push vers :\n%1$s</string>
+    <string name="attach_gallery">Galerie</string>
+    <string name="attach_camera">Photo</string>
+    <string name="remove_image">Retirer la photo</string>
+    <string name="pending_image_description">Photo jointe</string>
+    <string name="photo_label">📷 Photo</string>
 </resources>
