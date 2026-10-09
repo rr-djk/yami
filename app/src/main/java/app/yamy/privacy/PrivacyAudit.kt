@@ -7,7 +7,7 @@ import android.view.WindowManager
 import java.io.File
 import app.yamy.connect.NetworkMode
 import app.yamy.connect.NetworkModeStore
-import app.yamy.mcp.GmailCredentialStore
+import app.yamy.mcp.discord.DiscordTokenStore
 
 /** Une vérification de confidentialité, calculée en direct sur l'appareil. */
 data class PrivacyCheck(val label: String, val passed: Boolean, val detail: String)
@@ -18,13 +18,16 @@ class PrivacyAudit(
     private val box: KeystoreSecretBox,
     private val lock: AppLock,
     private val network: NetworkModeStore,
-    private val gmail: GmailCredentialStore,
+    private val discord: DiscordTokenStore,
 ) {
     fun run(windowFlags: Int): List<PrivacyCheck> {
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         val permissions = info.requestedPermissions.orEmpty().map { it.substringAfterLast('.') }
         val hasInternet = permissions.contains("INTERNET")
         val offline = network.mode.value == NetworkMode.OFFLINE
+        val traffic = NetworkModeStore.trafficBytes()
+        val baseline = network.offlineBaseline
+        val silent = traffic >= 0 && baseline >= 0 && traffic == baseline
         val backupAllowed = (context.applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP) != 0
         val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         val leftovers = File(context.cacheDir, "camera").list().orEmpty().isNotEmpty() ||
@@ -33,13 +36,20 @@ class PrivacyAudit(
         return listOf(
             PrivacyCheck(
                 "Mode hors ligne",
-                offline,
+                !hasInternet || (offline && (silent || traffic < 0)),
                 when {
                     !hasInternet -> "Aucune permission INTERNET : rien ne peut sortir du téléphone"
-                    offline -> "Le modèle tourne sur le téléphone. Les connecteurs (Gmail) sont coupés : rien ne sort"
-                    gmail.load() != null -> "Mode Connecté : seuls les emails que tu confirmes sortent, via Gmail"
-                    else -> "Mode Connecté, mais aucun connecteur configuré : rien ne sort"
+                    offline && silent -> "0 octet échangé depuis le passage en Hors ligne (compteur réseau d'Android)"
+                    offline && traffic < 0 -> "Hors ligne (contrôle logiciel) : compteur réseau d'Android indisponible"
+                    offline -> "⚠ Du trafic a été compté depuis le passage en Hors ligne : ${traffic - baseline} octets"
+                    discord.load() != null -> "Mode Connecté : les messages que tu confirmes partent sur Discord"
+                    else -> "Mode Connecté, aucun connecteur configuré"
                 },
+            ),
+            PrivacyCheck(
+                "Permission INTERNET",
+                true,
+                if (hasInternet) "Déclarée pour les connecteurs MCP. Le blocage hors ligne est logiciel ; le compteur ci-dessus le vérifie." else "Absente",
             ),
             PrivacyCheck(
                 "Sauvegarde cloud désactivée",

@@ -21,7 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -29,29 +31,31 @@ import androidx.compose.ui.unit.dp
 import app.yamy.R
 import app.yamy.connect.NetworkMode
 import app.yamy.connect.NetworkModeStore
-import app.yamy.mcp.GmailCredentialStore
-import app.yamy.mcp.gmail.GmailCredentials
-import app.yamy.mcp.gmail.GmailMcpServer
+import app.yamy.mcp.discord.DiscordTokenStore
 import app.yamy.ui.components.RetroButton
 import app.yamy.ui.components.RetroCard
+import app.yamy.ui.components.RetroOutlinedButton
 import app.yamy.ui.components.RetroTextButton
 import app.yamy.ui.components.RetroTextField
 import app.yamy.ui.theme.RetroColors
 
-/** Switch Hors ligne / Connecté et configuration du connecteur MCP Gmail. */
+/** Switch Hors ligne / Connecté et configuration du connecteur MCP Discord (bot). */
 @Composable
-fun ConnectorsSection(network: NetworkModeStore, credentials: GmailCredentialStore) {
+fun ConnectorsSection(
+    network: NetworkModeStore,
+    token: DiscordTokenStore,
+    onChanged: () -> Unit = {},
+    onTest: ((String) -> Unit) -> Unit = {},
+) {
     val mode by network.mode.collectAsState()
     var confirming by rememberSaveable { mutableStateOf(false) }
-    var configured by remember { mutableStateOf(credentials.load()?.user) }
-    var address by rememberSaveable { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var configured by remember { mutableStateOf(token.load() != null) }
+    // Jamais dans l'état sauvegardé du système : `remember`, pas `rememberSaveable`.
+    var typed by remember { mutableStateOf("") }
+    var testResult by remember { mutableStateOf<String?>(null) }
     val connected = mode == NetworkMode.CONNECTED
 
-    RetroCard(
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = if (connected) RetroColors.Warning else RetroColors.Surface,
-    ) {
+    RetroCard(modifier = Modifier.fillMaxWidth(), containerColor = if (connected) RetroColors.Warning else RetroColors.Surface) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.connectors_title), style = MaterialTheme.typography.titleLarge)
             val switchLabel = stringResource(R.string.connected_mode)
@@ -72,19 +76,35 @@ fun ConnectorsSection(network: NetworkModeStore, credentials: GmailCredentialSto
             }
             Text(stringResource(R.string.connected_mode_detail), style = MaterialTheme.typography.bodyMedium)
 
-            val user = configured
-            if (user != null) {
-                Text(stringResource(R.string.gmail_configured, user), style = MaterialTheme.typography.bodyLarge)
-                RetroTextButton(onClick = {
-                    credentials.clear()
-                    configured = null
-                }, label = stringResource(R.string.gmail_remove))
+            Text(stringResource(R.string.discord_title), style = MaterialTheme.typography.titleMedium)
+            if (configured) {
+                Text(stringResource(R.string.discord_configured), style = MaterialTheme.typography.bodyLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RetroOutlinedButton(onClick = {
+                        if (!connected) {
+                            testResult = null
+                            return@RetroOutlinedButton
+                        }
+                        testResult = "…"
+                        onTest { testResult = it }
+                    }) { Text(stringResource(R.string.discord_test)) }
+                    RetroTextButton(onClick = {
+                        token.clear()
+                        configured = false
+                        testResult = null
+                        onChanged()
+                    }, label = stringResource(R.string.discord_remove))
+                }
+                if (!connected) Text(stringResource(R.string.discord_need_connected), style = MaterialTheme.typography.bodyMedium)
+                testResult?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                }
             } else {
-                RetroTextField(address, { address = it.trim() }, label = { Text(stringResource(R.string.gmail_address)) }, singleLine = true, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
+                Text(stringResource(R.string.discord_guide), style = MaterialTheme.typography.bodyMedium)
                 RetroTextField(
-                    password,
-                    { password = it },
-                    label = { Text(stringResource(R.string.gmail_password)) },
+                    typed,
+                    { typed = it.trim() },
+                    label = { Text(stringResource(R.string.discord_token)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -92,11 +112,12 @@ fun ConnectorsSection(network: NetworkModeStore, credentials: GmailCredentialSto
                 )
                 RetroButton(
                     onClick = {
-                        credentials.save(GmailCredentials(address, password))
-                        configured = address
-                        password = ""
+                        token.save(typed)
+                        typed = ""
+                        configured = true
+                        onChanged()
                     },
-                    enabled = GmailMcpServer.isValidAddress(address) && password.filterNot { it.isWhitespace() }.length >= 16,
+                    enabled = DiscordTokenStore.looksValid(typed),
                 ) { Text(stringResource(R.string.save)) }
             }
         }

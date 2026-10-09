@@ -23,10 +23,10 @@ import app.yamy.memory.Scribe
 import app.yamy.memory.ScribeResult
 import app.yamy.connect.NetworkMode
 import app.yamy.connect.NetworkModeStore
-import app.yamy.mcp.EmailDraft
-import app.yamy.mcp.EmailDrafts
-import app.yamy.mcp.GmailConnector
-import app.yamy.mcp.gmail.GmailMcpServer
+import app.yamy.mcp.discord.DiscordConnector
+import app.yamy.mcp.discord.DiscordDraft
+import app.yamy.mcp.discord.DiscordDrafts
+import app.yamy.mcp.discord.DiscordMcpServer
 import app.yamy.vision.ImageSource
 import app.yamy.voice.SegmenterEvent
 import app.yamy.voice.Speaker
@@ -94,7 +94,7 @@ class ChatViewModel(
     private val memory: MemoryRepository,
     private val scribe: Scribe,
     private val network: NetworkModeStore,
-    private val gmail: GmailConnector,
+    private val discord: DiscordConnector,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -106,24 +106,29 @@ class ChatViewModel(
     private val voice = MutableStateFlow<VoiceUi?>(null)
     private val chainRun = MutableStateFlow<ChainRunUi?>(null)
     private val _scribe = MutableStateFlow<ScribeUi?>(null)
-    private val _pendingEmail = MutableStateFlow<EmailDraft?>(null)
-    private val _sendingEmail = MutableStateFlow(false)
+    private val _pendingMessage = MutableStateFlow<DiscordDraft?>(null)
+    private val _sending = MutableStateFlow(false)
+    private var sendJob: Job? = null
 
-    /** Email proposé par Gemma, en attente de la décision de la personne. */
-    val pendingEmail: StateFlow<EmailDraft?> = _pendingEmail
-    val sendingEmail: StateFlow<Boolean> = _sendingEmail
+    /** Message Discord proposé par Gemma, en attente de la décision de la personne. */
+    val pendingMessage: StateFlow<DiscordDraft?> = _pendingMessage
+    val sending: StateFlow<Boolean> = _sending
 
     /** Hors ligne (défaut) ou Connecté : affiché en permanence dans le chat. */
     val networkMode: StateFlow<NetworkMode> = network.mode
 
     /** Gemma propose seulement : rien ne part sans le bouton Envoyer. Appelé par l'outil, sur un fil natif. */
-    private val drafts = EmailDrafts { draft ->
-        val problem = GmailMcpServer.validate(draft.to, draft.subject, draft.body)
-        if (problem != null) {
-            "Brouillon refusé : $problem"
-        } else {
-            _pendingEmail.value = draft
-            "Brouillon prêt. Dis à la personne de le relire : elle seule peut confirmer l'envoi avec le bouton Envoyer."
+    private val drafts = DiscordDrafts { channelName, content ->
+        val channel = DiscordConnector.resolve(channelName, discord.channels)
+        val text = DiscordMcpServer.normalize(content)
+        val problem = channel?.let { DiscordMcpServer.validate(it.id, text) }
+        when {
+            network.mode.value != NetworkMode.CONNECTED -> "Message refusé : mode hors ligne."
+            channel == null -> "Salon introuvable. Salons disponibles : " + discord.channels.joinToString { "#" + it.name }
+            problem != null -> "Message refusé : $problem"
+            // Un seul brouillon à la fois : impossible de remplacer celui que la personne est en train de relire.
+            !_pendingMessage.compareAndSet(null, DiscordDraft(channel, text)) -> "Message refusé : un autre attend déjà la décision de la personne."
+            else -> "Message prêt. Dis à la personne de le relire : elle seule peut confirmer l'envoi avec le bouton Envoyer."
         }
     }
 
@@ -145,7 +150,7 @@ class ChatViewModel(
     /** Sérialise les opérations qui touchent à la conversation du moteur (envoi, effacement, reprise). */
     private val conversationLock = Mutex()
     private var notesAvailable = false
-    private var emailEnabled = false
+    private var discordEnabled = false
 
     /** Discussion dont le contexte est chargé dans le moteur : un tour la recharge si elle a changé. */
     private var conversationSessionId: Long? = null
@@ -168,7 +173,9 @@ class ChatViewModel(
         viewModelScope.launch {
             network.mode.drop(1).collect { mode ->
                 engine.invalidateConversation()
-                if (mode == NetworkMode.OFFLINE) _pendingEmail.value = null
+                // Tout changement de mode annule le brouillon : il ne peut pas « revenir » plus tard.
+                _pendingMessage.value = null
+                if (mode == NetworkMode.CONNECTED) refreshDiscordChannels()
             }
         }
     }
@@ -179,6 +186,7 @@ class ChatViewModel(
             status.value = EngineStatus.MODEL_MISSING
             return
         }
+        if (network.mode.value == NetworkMode.CONNECTED && discord.isConfigured) refreshDiscordChannels()
         try {
             engine.load()
             conversationLock.withLock { restartConversation() }
@@ -200,17 +208,19 @@ class ChatViewModel(
                 memoryIndex = MemoryFormat.index(notes)
                 notes.isNotEmpty()
             }
-            val canEmail = network.mode.value == NetworkMode.CONNECTED && gmail.isConfigured
-            emailEnabled = canEmail
+            val canPost = network.mode.value == NetworkMode.CONNECTED && discord.isConfigured && discord.channels.isNotEmpty()
+            discordEnabled = canPost
             val base = persona.systemPrompt() +
                 session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty() +
                 memoryIndex.takeIf { it.isNotBlank() }?.let {
                     "\n\n## Ce que tu sais déjà de la personne (tes notes)\n$it\n" +
                         "Si un détail t'aide à répondre, appelle l'outil lireNote avec le nom de la note. N'invente rien au-delà."
                 }.orEmpty() +
-                (if (canEmail) {
-                    "\n\n## Email (mode Connecté)\nSi la personne te demande d'envoyer un email, appelle l'outil preparerEmail. " +
-                        "Tu n'envoies rien toi-même : la personne relit et confirme. N'invente jamais d'adresse."
+                (if (canPost) {
+                    "\n\n## Discord (mode Connecté)\nSalons disponibles : " +
+                        discord.channels.take(MAX_PROMPT_CHANNELS).joinToString { it.label } +
+                        "\nSi la personne te demande de poster sur Discord, appelle l'outil preparerMessage avec le nom du salon. " +
+                        "Tu ne publies rien toi-même : la personne relit et confirme."
                 } else {
                     ""
                 })
@@ -221,7 +231,7 @@ class ChatViewModel(
             history,
             skills.takeIf { available.any { !it.isChain } },
             memory.takeIf { notesAvailable },
-            drafts.takeIf { emailEnabled },
+            drafts.takeIf { discordEnabled },
         )
         conversationSessionId = session.id
     }
@@ -410,28 +420,55 @@ class ChatViewModel(
         _scribe.value = null
     }
 
-    /** La personne confirme : l'email part via le connecteur MCP Gmail (refusé en mode Hors ligne). */
-    fun confirmEmail() {
-        val draft = _pendingEmail.value ?: return
-        if (_sendingEmail.value) return
-        viewModelScope.launch {
-            _sendingEmail.value = true
+    /** La personne confirme le message AFFICHÉ : il part via le connecteur MCP Discord (refusé en mode Hors ligne). */
+    fun confirmMessage(shown: DiscordDraft) {
+        if (_sending.value || status.value == EngineStatus.GENERATING) return
+        // N'envoie que le brouillon relu, jamais un autre qui l'aurait remplacé entre-temps.
+        if (_pendingMessage.value != shown) return
+        val session = currentSession.value
+        sendJob = viewModelScope.launch {
+            _sending.value = true
             val text = try {
-                val result = withContext(Dispatchers.IO) { gmail.send(draft) }
-                if (result.isError) "📧 L'email n'est pas parti : ${result.text}" else "📧 Email envoyé à ${draft.to} (« ${draft.subject} »)."
+                val result = withContext(Dispatchers.IO) { discord.send(shown) }
+                if (result.isError) "💬 Le message n'est pas parti : ${result.text}" else "💬 Message publié dans ${shown.channel.label}."
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                "📧 L'email n'est pas parti : ${e.message}"
+                "💬 Le message n'est pas parti : ${e.message}"
+            } finally {
+                _sending.value = false
             }
-            _sendingEmail.value = false
-            _pendingEmail.value = null
-            currentSession.value?.let { repository.add(ChatMessage(sessionId = it.id, role = Role.YAMY, text = text)) }
+            _pendingMessage.compareAndSet(shown, null)
+            // Le compte rendu va dans la discussion d'origine, jamais dans une autre (ou après un effacement).
+            if (session != null && currentSession.value?.id == session.id) {
+                repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = text))
+            }
         }
     }
 
-    fun cancelEmail() {
-        _pendingEmail.value = null
+    fun cancelMessage() {
+        _pendingMessage.value = null
+    }
+
+    /** Actualise la liste des salons (réseau) ; sans effet hors ligne ou sans jeton. */
+    fun refreshDiscordChannels(onDone: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            val message = try {
+                val found = withContext(Dispatchers.IO) { discord.refreshChannels() }
+                engine.invalidateConversation()
+                if (found.isEmpty()) "Aucun salon : invite le bot sur un serveur." else "${found.size} salon(s) : " + found.joinToString { "#" + it.name }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                e.message ?: "Erreur Discord"
+            }
+            onDone(message)
+        }
+    }
+
+    /** Le jeton ou le mode ont changé : outils et prompt rechargés au prochain tour. */
+    fun invalidateEngine() {
+        viewModelScope.launch { engine.invalidateConversation() }
     }
 
     /** Termine l'écoute : le dernier morceau est transcrit puis envoyé. */
@@ -517,6 +554,7 @@ class ChatViewModel(
     fun clearConversation() {
         viewModelScope.launch {
             stopActivity()
+            _pendingMessage.value = null
             val wasUsable = status.value != EngineStatus.MODEL_MISSING && status.value != EngineStatus.LOADING
             if (wasUsable) status.value = EngineStatus.LOADING
             conversationLock.withLock {
@@ -584,6 +622,8 @@ class ChatViewModel(
     /** Arrête l'écoute, la voix et la génération en cours, et attend qu'elles soient vraiment finies. */
     private suspend fun stopActivity() {
         speaker.stop()
+        sendJob?.cancelAndJoin()
+        _sending.value = false
         voiceJob?.cancelAndJoin()
         generation?.cancelAndJoin()
     }
@@ -593,7 +633,7 @@ class ChatViewModel(
         chainRun.value = null
         voice.value = null
         _scribe.value = null
-        _pendingEmail.value = null
+        _pendingMessage.value = null
         draft.value = ""
         error.value = null
         pendingImage.value = null
@@ -636,6 +676,7 @@ class ChatViewModel(
     companion object {
         private const val HISTORY_TURNS = 20
         private const val TITLE_LENGTH = 40
+        private const val MAX_PROMPT_CHANNELS = 20
         private const val LEVEL_BARS = 24
         private const val SCRIBE_MESSAGES = 16
         private const val TRANSCRIBE_REQUEST = "Transcris cet audio."
