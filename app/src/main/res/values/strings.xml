@@ -6,7 +6,7 @@
     <string name="welcome_body">Comment puis-je t\'aider ? De quoi veux-tu parler ?</string>
     <string name="input_hint">Écris à Yamy…</string>
     <string name="send">Envoyer</string>
-    <string name="clear_conversation">Effacer</string>
+    <string name="clear_conversation">🧹 Effacer les messages</string>
     <string name="model_missing">Modèle introuvable. Copie-le avec adb push vers :\n%1$s</string>
     <string name="attach_gallery">Galerie</string>
     <string name="attach_camera">Photo</string>
@@ -42,9 +42,9 @@
     <string name="thinking">Yamy réfléchit…</string>
     <string name="hide_keyboard">Fermer le clavier</string>
     <string name="sessions_title">Discussions</string>
-    <string name="new_session">+ Nouvelle discussion</string>
+    <string name="new_session">＋ Nouvelle discussion</string>
     <string name="choose_starter">De quoi veux-tu parler ?</string>
-    <string name="delete_session">Supprimer la discussion</string>
+    <string name="delete_session">🗑️ Supprimer la discussion</string>
     <string name="delete_session_confirm">Cette discussion et tous ses messages seront supprimés.</string>
     <string name="back_to_sessions">← Discussions</string>
     <string name="tab_sessions">Discussions</string>
@@ -62,7 +62,7 @@
     <string name="voice_label">🎙️ Message vocal</string>
     <string name="mic_denied">Le micro est nécessaire pour parler à Yamy. Tu peux l\'autoriser dans les réglages.</string>
     <string name="agents">🤝 Agents</string>
-    <string name="remember">📝 Retenir</string>
+    <string name="remember">📝 Retenir cette discussion</string>
     <string name="scribe_working">📝 Le Scribe relit la discussion…</string>
     <string name="scribe_nothing">📝 Rien de nouveau à retenir.</string>
     <string name="scribe_done">📝 Yamy a noté : %1$s</string>
@@ -94,4 +94,12 @@
     <string name="message_send">Publier</string>
     <string name="message_sending">Envoi…</string>
     <string name="message_offline">Repasse en mode Connecté pour publier.</string>
+    <string name="open_menu">Ouvrir le menu</string>
+    <string name="more_actions">Plus d\'actions</string>
+    <string name="add_menu">Ajouter une photo ou un agent</string>
+    <string name="take_photo">📷 Prendre une photo</string>
+    <string name="pick_gallery">🖼️ Choisir dans la galerie</string>
+    <string name="drawer_tools">🛠️ Outils et agents</string>
+    <string name="drawer_memory">🧠 Mémoire</string>
+    <string name="drawer_privacy">🔒 Vie privée et connecteurs</string>
 </resources>

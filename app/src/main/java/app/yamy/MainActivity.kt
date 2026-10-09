@@ -23,15 +23,19 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.yamy.chat.ChatScreen
 import app.yamy.chat.ChatViewModel
-import app.yamy.chat.SessionsScreen
+import app.yamy.chat.Session
+import app.yamy.ui.nav.Destination
+import app.yamy.ui.nav.YamyDrawer
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import app.yamy.memory.MemoryScreen
 import app.yamy.memory.MemoryViewModel
-import app.yamy.ui.nav.RetroBottomBar
-import app.yamy.ui.nav.Tab
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import app.yamy.privacy.LockScreen
 import app.yamy.privacy.PrivacyScreen
 import app.yamy.privacy.ConnectorsSection
@@ -80,52 +84,68 @@ class MainActivity : FragmentActivity() {
 
     @androidx.compose.runtime.Composable
     private fun Content() {
-        // Le chat s'ouvre en plein écran (place pour le clavier) ; les autres écrans ont la barre de navigation.
-        var inChat by rememberSaveable { mutableStateOf(true) }
-        var tab by rememberSaveable { mutableStateOf(Tab.SESSIONS) }
+        var destination by rememberSaveable { mutableStateOf<Destination?>(null) }
+        val drawer = rememberDrawerState(DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
         val chat = viewModel<ChatViewModel>(
             factory = factory {
-                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe, app.networkMode, app.discord)
+                ChatViewModel(
+                    app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper,
+                    app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe, app.networkMode, app.discord,
+                )
             },
         )
-        if (inChat) {
-            BackHandler { inChat = false }
-            ChatScreen(
-                chat,
-                app.modelLocator.modelFile.path,
-                onBack = { inChat = false },
-                onOpenConnectors = {
-                    tab = Tab.PRIVACY
-                    inChat = false
-                },
-            )
-            return
+        val sessions by chat.sessionList.collectAsState()
+        val ui by chat.state.collectAsState()
+        val network by chat.networkMode.collectAsState()
+        fun closeDrawerThen(action: () -> Unit) {
+            action()
+            scope.launch { drawer.close() }
         }
-        BackHandler(enabled = tab != Tab.SESSIONS) { tab = Tab.SESSIONS }
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.surface,
-            bottomBar = { RetroBottomBar(tab) { tab = it } },
-        ) { inner ->
-            val content = Modifier.padding(inner).consumeWindowInsets(inner)
-            Box(modifier = content) {
-                when (tab) {
-                    Tab.SESSIONS -> SessionsScreen(chat, onOpenChat = { inChat = true })
-                    Tab.TOOLS -> {
-                        val skills = viewModel<SkillsViewModel>(factory = factory { SkillsViewModel(app.skills, app.skillCreator, app.engine) })
-                        LaunchedEffect(Unit) { skills.refresh() }
-                        SkillsScreen(skills) { tab = Tab.SESSIONS }
-                    }
-                    Tab.MEMORY -> {
-                        val memoryVm = viewModel<MemoryViewModel>(factory = factory { MemoryViewModel(app.memory, app.engine) })
-                        LaunchedEffect(Unit) { memoryVm.refresh() }
-                        MemoryScreen(memoryVm)
-                    }
-                    Tab.PRIVACY -> PrivacyScreen(
-                        audit = app.privacyAudit,
-                        connectors = { ConnectorsSection(app.networkMode, app.discordToken, onChanged = chat::invalidateEngine, onTest = chat::refreshDiscordChannels) },
-                        onWipe = { chat.wipeAll { tab = Tab.SESSIONS } },
-                        onClose = { tab = Tab.SESSIONS },
+
+        when (val open = destination) {
+            null -> ModalNavigationDrawer(
+                drawerState = drawer,
+                drawerContent = {
+                    YamyDrawer(
+                        sessions = sessions,
+                        currentId = ui.session?.id,
+                        network = network,
+                        onNewChat = { closeDrawerThen { chat.newSession(Session.DEFAULT_TITLE, "") } },
+                        onOpenSession = { id -> closeDrawerThen { chat.openSession(id) } },
+                        onOpen = { target -> closeDrawerThen { destination = target } },
                     )
+                },
+            ) {
+                BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
+                ChatScreen(
+                    chat,
+                    app.modelLocator.modelFile.path,
+                    onOpenDrawer = { scope.launch { drawer.open() } },
+                    onOpenConnectors = { destination = Destination.PRIVACY },
+                )
+            }
+            else -> {
+                BackHandler { destination = null }
+                Box(modifier = Modifier.systemBarsPadding()) {
+                    when (open) {
+                        Destination.TOOLS -> {
+                            val skills = viewModel<SkillsViewModel>(factory = factory { SkillsViewModel(app.skills, app.skillCreator, app.engine) })
+                            LaunchedEffect(Unit) { skills.refresh() }
+                            SkillsScreen(skills) { destination = null }
+                        }
+                        Destination.MEMORY -> {
+                            val memoryVm = viewModel<MemoryViewModel>(factory = factory { MemoryViewModel(app.memory, app.engine) })
+                            LaunchedEffect(Unit) { memoryVm.refresh() }
+                            MemoryScreen(memoryVm, onClose = { destination = null })
+                        }
+                        Destination.PRIVACY -> PrivacyScreen(
+                            audit = app.privacyAudit,
+                            connectors = { ConnectorsSection(app.networkMode, app.discordToken, onChanged = chat::invalidateEngine, onTest = chat::refreshDiscordChannels) },
+                            onWipe = { chat.wipeAll { destination = null } },
+                            onClose = { destination = null },
+                        )
+                    }
                 }
             }
         }
