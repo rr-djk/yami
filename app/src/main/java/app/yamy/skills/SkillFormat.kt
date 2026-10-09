@@ -17,6 +17,7 @@ object SkillFormat {
         appendLine("---")
         appendLine("name: ${skill.name}")
         appendLine("description: ${skill.description}")
+        if (skill.isChain) appendLine("type: ${Skill.TYPE_CHAINE}")
         appendLine("---")
         appendLine()
         append(skill.instructions.trim())
@@ -36,7 +37,8 @@ object SkillFormat {
             .toMap()
         val instructions = lines.drop(end + 2).joinToString("\n").trim()
 
-        return validate(Skill(header["name"].orEmpty(), header["description"].orEmpty(), instructions))
+        val type = if (header["type"] == Skill.TYPE_CHAINE) Skill.TYPE_CHAINE else Skill.TYPE_SIMPLE
+        return validate(Skill(header["name"].orEmpty(), header["description"].orEmpty(), instructions, type))
     }
 
     fun validate(skill: Skill): Result {

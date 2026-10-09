@@ -61,4 +61,5 @@
     <string name="stop_speaking">🔇 Couper la voix</string>
     <string name="voice_label">🎙️ Message vocal</string>
     <string name="mic_denied">Le micro est nécessaire pour parler à Yamy. Tu peux l\'autoriser dans les réglages.</string>
+    <string name="agents">🤝 Agents</string>
 </resources>

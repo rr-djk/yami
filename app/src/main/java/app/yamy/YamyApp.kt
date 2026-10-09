@@ -11,6 +11,8 @@ import app.yamy.engine.LiteRtChatEngine
 import app.yamy.engine.ModelLocator
 import app.yamy.persona.AssetPersonaProvider
 import app.yamy.persona.PersonaProvider
+import app.yamy.agents.ChainCatalog
+import app.yamy.agents.ChainRunner
 import app.yamy.privacy.AppLock
 import app.yamy.privacy.DataWiper
 import app.yamy.privacy.DatabasePassphrase
@@ -33,6 +35,7 @@ class YamyApp : Application() {
     val skillCreator: SkillCreator by lazy { SkillCreator(engine) }
     val voiceRecorder: VoiceRecorder by lazy { VoiceRecorder() }
     val speaker: Speaker by lazy { Speaker(this) }
+    val chainRunner: ChainRunner by lazy { ChainRunner(engine) }
     val imageSource: ImageSource by lazy { ContentResolverImageSource(this) }
     val secretBox: KeystoreSecretBox by lazy { KeystoreSecretBox() }
     val appLock: AppLock by lazy { AppLock(this) }
@@ -46,6 +49,8 @@ class YamyApp : Application() {
         super.onCreate()
         // Une photo d'appareil restée en cache après un arrêt brutal ne doit pas survivre.
         java.io.File(cacheDir, "camera").deleteRecursively()
+        // Chaînes d'agents livrées avec l'app : installées une fois, hors du thread principal.
+        Thread { runCatching { ChainCatalog.installDefaults(assets, skills) } }.start()
     }
 
     /**
