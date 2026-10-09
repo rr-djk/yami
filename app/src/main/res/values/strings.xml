@@ -39,4 +39,6 @@
     <string name="locked_title">Yamy est verrouillé</string>
     <string name="unlock">Déverrouiller</string>
     <string name="ai_disclaimer">Yamy est une IA, elle peut se tromper.</string>
+    <string name="thinking">Yamy réfléchit…</string>
+    <string name="hide_keyboard">Fermer le clavier</string>
 </resources>
