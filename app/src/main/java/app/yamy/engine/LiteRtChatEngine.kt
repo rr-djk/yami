@@ -53,7 +53,7 @@ class LiteRtChatEngine(
         }
     }
 
-    override suspend fun startConversation(systemPrompt: String?, history: List<Turn>, skills: SkillLookup?) {
+    override suspend fun startConversation(systemPrompt: String?, history: List<Turn>, skills: SkillLookup?, notes: SkillLookup?) {
         lifecycle.withLock {
             val loaded = checkNotNull(engine) { "Moteur non chargé" }
             withContext(Dispatchers.Default) {
@@ -62,7 +62,7 @@ class LiteRtChatEngine(
                     ConversationConfig(
                         systemInstruction = systemPrompt?.let { Contents.of(it) },
                         initialMessages = history.map { if (it.fromUser) Message.user(it.text) else Message.model(it.text) },
-                        tools = skills?.let { listOf(tool(SkillToolSet(it))) }.orEmpty(),
+                        tools = listOfNotNull(skills?.let { tool(SkillToolSet(it)) }, notes?.let { tool(NoteToolSet(it)) }),
                     ),
                 )
             }

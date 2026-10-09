@@ -28,12 +28,14 @@ interface ChatEngine : AutoCloseable {
 
     /**
      * Démarre une conversation, avec un prompt système et un historique optionnels.
-     * Si [skills] est fourni, le modèle peut charger un skill par son nom.
+     * Si [skills] est fourni, le modèle peut charger un skill par son nom ; si [notes] l'est, il peut lire
+     * une note de mémoire.
      */
     suspend fun startConversation(
         systemPrompt: String? = null,
         history: List<Turn> = emptyList(),
         skills: SkillLookup? = null,
+        notes: SkillLookup? = null,
     )
 
     /** Oublie la conversation courante : la prochaine doit être redémarrée. */

@@ -25,6 +25,7 @@ import app.yamy.chat.ChatScreen
 import app.yamy.chat.ChatViewModel
 import app.yamy.chat.SessionsScreen
 import app.yamy.memory.MemoryScreen
+import app.yamy.memory.MemoryViewModel
 import app.yamy.ui.nav.RetroBottomBar
 import app.yamy.ui.nav.Tab
 import androidx.compose.foundation.layout.Box
@@ -78,7 +79,7 @@ class MainActivity : FragmentActivity() {
         var tab by rememberSaveable { mutableStateOf(Tab.SESSIONS) }
         val chat = viewModel<ChatViewModel>(
             factory = factory {
-                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner)
+                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe)
             },
         )
         if (inChat) {
@@ -100,7 +101,11 @@ class MainActivity : FragmentActivity() {
                         LaunchedEffect(Unit) { skills.refresh() }
                         SkillsScreen(skills) { tab = Tab.SESSIONS }
                     }
-                    Tab.MEMORY -> MemoryScreen()
+                    Tab.MEMORY -> {
+                        val memoryVm = viewModel<MemoryViewModel>(factory = factory { MemoryViewModel(app.memory, app.engine) })
+                        LaunchedEffect(Unit) { memoryVm.refresh() }
+                        MemoryScreen(memoryVm)
+                    }
                     Tab.PRIVACY -> PrivacyScreen(
                         audit = app.privacyAudit,
                         onWipe = { chat.wipeAll { tab = Tab.SESSIONS } },

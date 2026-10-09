@@ -17,6 +17,10 @@ import app.yamy.agents.AgentStep
 import app.yamy.agents.Chain
 import app.yamy.agents.ChainFormat
 import app.yamy.agents.ChainRunner
+import app.yamy.memory.MemoryFormat
+import app.yamy.memory.MemoryRepository
+import app.yamy.memory.Scribe
+import app.yamy.memory.ScribeResult
 import app.yamy.vision.ImageSource
 import app.yamy.voice.SegmenterEvent
 import app.yamy.voice.Speaker
@@ -45,6 +49,9 @@ import kotlinx.coroutines.withContext
 enum class EngineStatus { LOADING, READY, LISTENING, GENERATING, MODEL_MISSING, ERROR }
 
 /** Écoute en cours : niveaux récents pour l'onde, durée, et texte déjà transcrit. */
+/** Passage du Scribe : [working] pendant la relecture, puis les notes écrites. */
+data class ScribeUi(val working: Boolean, val result: ScribeResult? = null)
+
 /** Chaîne d'agents en cours (ou terminée, jusqu'à ce que son résumé arrive de la base). */
 data class ChainRunUi(val steps: List<AgentStep>, val summary: String? = null)
 
@@ -77,6 +84,8 @@ class ChatViewModel(
     private val recorder: VoiceRecorder,
     private val speaker: Speaker,
     private val chainRunner: ChainRunner,
+    private val memory: MemoryRepository,
+    private val scribe: Scribe,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -87,6 +96,10 @@ class ChatViewModel(
     private val currentSession = MutableStateFlow<Session?>(null)
     private val voice = MutableStateFlow<VoiceUi?>(null)
     private val chainRun = MutableStateFlow<ChainRunUi?>(null)
+    private val _scribe = MutableStateFlow<ScribeUi?>(null)
+
+    /** Passage du Scribe : en cours, ou terminé avec les notes écrites (annulable). */
+    val scribeState: StateFlow<ScribeUi?> = _scribe
     private val _chains = MutableStateFlow<List<Chain>>(emptyList())
 
     /** Chaînes d'agents disponibles (livrées avec l'app ou créées par la personne). */
@@ -102,6 +115,8 @@ class ChatViewModel(
 
     /** Sérialise les opérations qui touchent à la conversation du moteur (envoi, effacement, reprise). */
     private val conversationLock = Mutex()
+    private var notesAvailable = false
+    private var memoryIndex = ""
     private var generation: Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -141,10 +156,24 @@ class ChatViewModel(
         val (prompt, available) = withContext(Dispatchers.IO) {
             val all = skills.list()
             _chains.value = all.mapNotNull { ChainFormat.parse(it) }
-            val base = persona.systemPrompt() + session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty()
+            notesAvailable = memory.list().let { notes ->
+                memoryIndex = MemoryFormat.index(notes)
+                notes.isNotEmpty()
+            }
+            val base = persona.systemPrompt() +
+                session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty() +
+                memoryIndex.takeIf { it.isNotBlank() }?.let {
+                    "\n\n## Ce que tu sais déjà de la personne (tes notes)\n$it\n" +
+                        "Si un détail t'aide à répondre, appelle l'outil lireNote avec le nom de la note. N'invente rien au-delà."
+                }.orEmpty()
             SkillPrompt.withSkills(base, all) to all
         }
-        engine.startConversation(prompt, history, skills.takeIf { available.isNotEmpty() })
+        engine.startConversation(
+            prompt,
+            history,
+            skills.takeIf { available.any { !it.isChain } },
+            memory.takeIf { notesAvailable },
+        )
     }
 
     /** Prépare une photo choisie (galerie ou appareil) pour le prochain message. */
@@ -289,6 +318,43 @@ class ChatViewModel(
                 error.value = "Micro : ${e.message}"
             }
         }
+    }
+
+    /** Le Scribe relit la discussion courante et met à jour les notes de mémoire. */
+    fun rememberSession() {
+        if (status.value != EngineStatus.READY) return
+        val session = currentSession.value ?: return
+        generation = viewModelScope.launch {
+            status.value = EngineStatus.GENERATING
+            _scribe.value = ScribeUi(working = true)
+            try {
+                val result = conversationLock.withLock {
+                    scribe.remember(repository.recent(session.id, SCRIBE_MESSAGES))
+                }
+                _scribe.value = ScribeUi(working = false, result = result)
+                status.value = EngineStatus.READY
+            } catch (e: CancellationException) {
+                _scribe.value = null
+                throw e
+            } catch (e: Throwable) {
+                _scribe.value = null
+                recoverFromTurnError(e)
+            }
+        }
+    }
+
+    /** Annule le dernier passage du Scribe. */
+    fun undoRemember() {
+        val result = _scribe.value?.result ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { scribe.undo(result) }
+            engine.invalidateConversation()
+            _scribe.value = null
+        }
+    }
+
+    fun dismissScribe() {
+        _scribe.value = null
     }
 
     /** Termine l'écoute : le dernier morceau est transcrit puis envoyé. */
@@ -479,6 +545,7 @@ class ChatViewModel(
         private const val HISTORY_TURNS = 20
         private const val TITLE_LENGTH = 40
         private const val LEVEL_BARS = 24
+        private const val SCRIBE_MESSAGES = 16
         private const val TRANSCRIBE_REQUEST = "Transcris cet audio."
         private const val TRANSCRIBE_PROMPT =
             "Tu es un outil de transcription. Écris uniquement, mot pour mot, ce qui est dit dans l'audio. Aucune réponse, aucun commentaire."
