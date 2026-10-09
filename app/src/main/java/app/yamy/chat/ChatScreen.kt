@@ -41,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yamy.R
@@ -77,8 +79,11 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
     val rows = remember(ui.messages, ui.draft) {
         if (ui.draft.isBlank() || ui.messages.lastOrNull()?.text == ui.draft) ui.messages else ui.messages + ChatMessage(id = -1, role = Role.YAMY, text = ui.draft)
     }
-    LaunchedEffect(rows.size, ui.draft.length) {
-        if (rows.isNotEmpty()) listState.scrollToItem(rows.lastIndex)
+    val thinking = ui.status == EngineStatus.GENERATING && ui.draft.isBlank()
+    // Liste inversée (index 0 = bas) : la réponse qui s'allonge reste collée en bas de l'écran.
+    // On ne suit le flux que si l'utilisateur est déjà en bas, pour ne pas l'empêcher de remonter lire.
+    LaunchedEffect(rows.size, thinking) {
+        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
     }
 
     Column(modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
@@ -109,10 +114,12 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
                 rows.isEmpty() -> Welcome()
                 else -> LazyColumn(
                     state = listState,
+                    reverseLayout = true,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(rows, key = { it.id.takeIf { id -> id != -1L } ?: Long.MIN_VALUE }) { MessageBubble(it) }
+                    if (thinking) item(key = THINKING_KEY) { ThinkingBubble() }
+                    items(rows.asReversed(), key = { it.id.takeIf { id -> id != -1L } ?: Long.MIN_VALUE }) { MessageBubble(it) }
                 }
             }
         }
@@ -190,12 +197,26 @@ private fun Notice(text: String, technical: Boolean = false, isError: Boolean = 
     }
 }
 
+private const val THINKING_KEY = "thinking"
+
+/** Affiché entre l'envoi et le premier mot de la réponse. */
+@Composable
+private fun ThinkingBubble() {
+    val label = stringResource(R.string.thinking)
+    Row(modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) {
+        RetroCard {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(16.dp))
+        }
+    }
+}
+
 @Composable
 private fun MessageBubble(message: ChatMessage) {
     val mine = message.role == Role.USER
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
+        // La bulle s'ajuste au texte, sans dépasser 88 % de la largeur.
+        Box(modifier = Modifier.fillMaxWidth(0.88f), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         RetroCard(
-            modifier = Modifier.fillMaxWidth(0.88f),
             containerColor = if (mine) RetroColors.Primary else RetroColors.Surface,
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -204,6 +225,7 @@ private fun MessageBubble(message: ChatMessage) {
                 }
                 Text(message.text, style = MaterialTheme.typography.bodyLarge)
             }
+        }
         }
     }
 }

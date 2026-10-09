@@ -129,6 +129,7 @@ class ChatViewModel(
         generation = viewModelScope.launch {
             status.value = EngineStatus.GENERATING
             error.value = null
+            draft.value = ""
             pendingImage.value = null
             repository.add(ChatMessage(role = Role.USER, text = prompt, hasImage = image != null))
             val plan = planner.plan(prompt)
@@ -152,12 +153,14 @@ class ChatViewModel(
                 }
                 status.value = EngineStatus.READY
             } catch (e: CancellationException) {
+                draft.value = ""
                 throw e
             } catch (e: Throwable) {
-                recoverFromTurnError(e)
-            } finally {
                 draft.value = ""
+                recoverFromTurnError(e)
             }
+            // En cas de succès, le brouillon n'est PAS vidé ici : l'écran le masque dès que la réponse
+            // enregistrée arrive de la base (sinon la bulle disparaît un instant avant de réapparaître).
         }
     }
 
