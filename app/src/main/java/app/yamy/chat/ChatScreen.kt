@@ -54,7 +54,7 @@ import app.yamy.ui.theme.RetroColors
 import app.yamy.ui.theme.TechnicalTextStyle
 
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit) {
+fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit, onOpenPrivacy: () -> Unit) {
     val ui by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
@@ -86,6 +86,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = RetroColors.Secondary)
             Row {
                 RetroTextButton(onClick = onOpenSkills, label = stringResource(R.string.skills), enabled = ui.status == EngineStatus.READY)
+                RetroTextButton(onClick = onOpenPrivacy, label = stringResource(R.string.privacy))
                 RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
             }
         }

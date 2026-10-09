@@ -1,9 +1,10 @@
 package app.yamy.skills
 
+import app.yamy.privacy.SecretBox
 import java.io.File
 
-/** Un dossier par skill (`skills/<nom>/SKILL.md`) dans le stockage interne de l'app. */
-class FileSkillRepository(private val root: File) : SkillRepository {
+/** Un dossier par skill (`skills/<nom>/SKILL.md`), contenu chiffré au repos. */
+class FileSkillRepository(private val root: File, private val box: SecretBox) : SkillRepository {
 
     override fun list(): List<Skill> =
         root.listFiles { f -> f.isDirectory }.orEmpty()
@@ -14,13 +15,14 @@ class FileSkillRepository(private val root: File) : SkillRepository {
         if (!isSafe(name)) return null
         val file = File(File(root, name), FILE_NAME)
         if (!file.isFile) return null
-        return (SkillFormat.parse(file.readText()) as? SkillFormat.Result.Valid)?.skill
+        val text = runCatching { String(box.decrypt(file.readBytes()), Charsets.UTF_8) }.getOrNull() ?: return null
+        return (SkillFormat.parse(text) as? SkillFormat.Result.Valid)?.skill
     }
 
     override fun save(skill: Skill) {
         require(SkillFormat.validate(skill) is SkillFormat.Result.Valid) { "Skill invalide : ${skill.name}" }
         val dir = File(root, skill.name).apply { mkdirs() }
-        File(dir, FILE_NAME).writeText(SkillFormat.format(skill))
+        File(dir, FILE_NAME).writeBytes(box.encrypt(SkillFormat.format(skill).toByteArray(Charsets.UTF_8)))
     }
 
     override fun delete(name: String) {

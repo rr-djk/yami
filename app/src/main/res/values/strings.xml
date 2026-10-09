@@ -27,4 +27,14 @@
     <string name="delete">Supprimer</string>
     <string name="close">Fermer</string>
     <string name="back">Retour</string>
+    <string name="privacy">Vie privée</string>
+    <string name="privacy_title">Vie privée</string>
+    <string name="privacy_intro">Ne nous croyez pas sur parole, vérifiez. Ces contrôles sont relus en direct sur ton téléphone.</string>
+    <string name="privacy_limits">Limites : un clavier tiers ou un téléphone déverrouillé restent hors du contrôle de Yamy. Yamy est une IA, pas un professionnel de santé.</string>
+    <string name="wipe_all">Tout effacer</string>
+    <string name="wipe_confirm">Cela supprime définitivement tes conversations et tes skills. Le modèle reste installé.</string>
+    <string name="wipe_yes">Oui, tout effacer</string>
+    <string name="cancel">Annuler</string>
+    <string name="locked_title">Yamy est verrouillé</string>
+    <string name="unlock">Déverrouiller</string>
 </resources>
