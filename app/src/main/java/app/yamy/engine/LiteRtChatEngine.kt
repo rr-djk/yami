@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.Message
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -36,15 +37,14 @@ class LiteRtChatEngine(
         engine = Engine(config).also { it.initialize() }
     }
 
-    override fun startConversation(systemPrompt: String?) {
+    override fun startConversation(systemPrompt: String?, history: List<Turn>) {
         val loaded = checkNotNull(engine) { "Moteur non chargé" }
         conversation?.close()
         conversation = loaded.createConversation(
-            if (systemPrompt == null) {
-                ConversationConfig()
-            } else {
-                ConversationConfig(systemInstruction = Contents.of(systemPrompt))
-            },
+            ConversationConfig(
+                systemInstruction = systemPrompt?.let { Contents.of(it) },
+                initialMessages = history.map { if (it.fromUser) Message.user(it.text) else Message.model(it.text) },
+            ),
         )
     }
 
