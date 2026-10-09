@@ -9,6 +9,8 @@ import app.yamy.engine.ModelLocator
 import app.yamy.engine.Turn
 import app.yamy.persona.PersonaProvider
 import app.yamy.privacy.DataWiper
+import app.yamy.safety.TurnPlan
+import app.yamy.safety.TurnPlanner
 import app.yamy.skills.SkillPrompt
 import app.yamy.skills.SkillRepository
 import app.yamy.vision.ImageSource
@@ -49,6 +51,7 @@ class ChatViewModel(
     private val imageSource: ImageSource,
     private val skills: SkillRepository,
     private val wiper: DataWiper,
+    private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
     private val draft = MutableStateFlow("")
@@ -128,11 +131,19 @@ class ChatViewModel(
             error.value = null
             pendingImage.value = null
             repository.add(ChatMessage(role = Role.USER, text = prompt, hasImage = image != null))
+            val plan = planner.plan(prompt)
+            if (plan is TurnPlan.Crisis) {
+                // Détresse aiguë : réponse fixe écrite en code, sans passer par le modèle.
+                repository.add(ChatMessage(role = Role.YAMY, text = plan.reply))
+                status.value = EngineStatus.READY
+                return@launch
+            }
+            val textForModel = (plan as TurnPlan.Model).textForModel
             val reply = StringBuilder()
             try {
                 conversationLock.withLock {
                     if (!engine.hasConversation) restartConversation()
-                    val input = ChatInput(prompt, listOfNotNull(image?.bytes))
+                    val input = ChatInput(textForModel, listOfNotNull(image?.bytes))
                     engine.send(input).collect { piece ->
                         reply.append(piece)
                         draft.value = reply.toString()
