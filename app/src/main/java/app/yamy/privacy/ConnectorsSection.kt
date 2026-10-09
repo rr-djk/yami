@@ -31,7 +31,12 @@ import androidx.compose.ui.unit.dp
 import app.yamy.R
 import app.yamy.connect.NetworkMode
 import app.yamy.connect.NetworkModeStore
+import app.yamy.mcp.discord.DiscordConnector
 import app.yamy.mcp.discord.DiscordTokenStore
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.ui.semantics.Role
 import app.yamy.ui.components.RetroButton
 import app.yamy.ui.components.RetroCard
 import app.yamy.ui.components.RetroOutlinedButton
@@ -44,8 +49,10 @@ import app.yamy.ui.theme.RetroColors
 fun ConnectorsSection(
     network: NetworkModeStore,
     token: DiscordTokenStore,
+    discord: DiscordConnector,
     onChanged: () -> Unit = {},
     onTest: ((String) -> Unit) -> Unit = {},
+    onRemoved: () -> Unit = {},
 ) {
     val mode by network.mode.collectAsState()
     var confirming by rememberSaveable { mutableStateOf(false) }
@@ -53,6 +60,8 @@ fun ConnectorsSection(
     // Jamais dans l'état sauvegardé du système : `remember`, pas `rememberSaveable`.
     var typed by remember { mutableStateOf("") }
     var testResult by remember { mutableStateOf<String?>(null) }
+    // Relu après chaque test ou coche (les salons et approbations vivent dans le connecteur).
+    var tick by remember { mutableStateOf(0) }
     val connected = mode == NetworkMode.CONNECTED
 
     RetroCard(modifier = Modifier.fillMaxWidth(), containerColor = if (connected) RetroColors.Warning else RetroColors.Surface) {
@@ -86,18 +95,38 @@ fun ConnectorsSection(
                             return@RetroOutlinedButton
                         }
                         testResult = "…"
-                        onTest { testResult = it }
+                        onTest {
+                            testResult = it
+                            tick++
+                        }
                     }) { Text(stringResource(R.string.discord_test)) }
                     RetroTextButton(onClick = {
-                        token.clear()
+                        onRemoved()
                         configured = false
                         testResult = null
-                        onChanged()
                     }, label = stringResource(R.string.discord_remove))
                 }
                 if (!connected) Text(stringResource(R.string.discord_need_connected), style = MaterialTheme.typography.bodyMedium)
                 testResult?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                }
+                val found = remember(tick) { discord.channels }
+                if (found.isNotEmpty()) {
+                    Text(stringResource(R.string.discord_channels_title), style = MaterialTheme.typography.titleSmall)
+                    found.forEach { channel ->
+                        var checked by remember(tick, channel.id) { mutableStateOf(discord.isApproved(channel.id)) }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Checkbox) { on ->
+                                discord.setApproved(channel.id, on)
+                                checked = on
+                                onChanged()
+                            },
+                        ) {
+                            Checkbox(checked = checked, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = RetroColors.Primary, checkmarkColor = RetroColors.Ink, uncheckedColor = RetroColors.Ink))
+                            Text(channel.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
                 }
             } else {
                 Text(stringResource(R.string.discord_guide), style = MaterialTheme.typography.bodyMedium)

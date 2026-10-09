@@ -79,10 +79,10 @@
     <string name="connected_mode">Mode connecté</string>
     <string name="connected_mode_detail">Hors ligne par défaut. Connecté, Yamy peut préparer des messages Discord via son connecteur MCP : tu relis et confirmes chaque envoi. Le modèle, lui, reste toujours sur le téléphone.</string>
     <string name="connect_confirm_title">Passer en mode Connecté ?</string>
-    <string name="connect_confirm_text">Seuls les messages que tu confirmes quitteront le téléphone, vers Discord. Ils peuvent contenir des extraits de tes discussions ou de tes notes : relis-les avant de publier. Le modèle reste toujours ici.</string>
+    <string name="connect_confirm_text">En mode Connecté, Yamy contacte Discord avec le jeton du bot pour lister les salons ; seuls les messages que tu confirmes y sont publiés, dans les salons que tu as cochés. Ils peuvent contenir des extraits de tes discussions ou de tes notes : relis-les. Le modèle reste toujours ici.</string>
     <string name="connect_yes">Me connecter</string>
     <string name="discord_title">Discord</string>
-    <string name="discord_guide">1. discord.com/developers › New Application › onglet Bot › Reset Token, puis copie le jeton.\n2. OAuth2 › URL Generator : coche « bot », puis les permissions « View Channels » et « Send Messages ».\n3. Ouvre l\'URL générée et invite le bot sur ton serveur.\n4. Colle le jeton ici. Ce n\'est pas ton mot de passe, et tu peux le révoquer à tout moment.</string>
+    <string name="discord_guide">1. discord.com/developers › New Application › onglet Bot › Reset Token, puis copie le jeton.\nDans l\'onglet Bot, décoche « Public Bot » pour que personne d\'autre ne puisse l\'inviter.\n2. OAuth2 › URL Generator : coche « bot », puis les permissions « View Channels » et « Send Messages ».\n3. Ouvre l\'URL générée et invite le bot sur ton serveur.\n4. Colle le jeton ici. Ce n\'est pas ton mot de passe, et tu peux le révoquer à tout moment.</string>
     <string name="discord_token">Jeton du bot</string>
     <string name="discord_configured">Bot Discord configuré</string>
     <string name="discord_test">Tester et lister les salons</string>
@@ -102,4 +102,6 @@
     <string name="drawer_tools">🛠️ Outils et agents</string>
     <string name="drawer_memory">🧠 Mémoire</string>
     <string name="drawer_privacy">🔒 Vie privée et connecteurs</string>
+    <string name="discord_suspicious">⚠ Nom en écriture mêlée ou non latine : vérifie que c\'est bien ton salon.</string>
+    <string name="discord_channels_title">Salons que Yamy peut utiliser</string>
 </resources>

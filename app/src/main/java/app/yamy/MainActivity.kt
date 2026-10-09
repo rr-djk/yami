@@ -141,7 +141,16 @@ class MainActivity : FragmentActivity() {
                         }
                         Destination.PRIVACY -> PrivacyScreen(
                             audit = app.privacyAudit,
-                            connectors = { ConnectorsSection(app.networkMode, app.discordToken, onChanged = chat::invalidateEngine, onTest = chat::refreshDiscordChannels) },
+                            connectors = {
+                                ConnectorsSection(
+                                    app.networkMode,
+                                    app.discordToken,
+                                    app.discord,
+                                    onChanged = chat::invalidateEngine,
+                                    onTest = { done -> chat.refreshDiscordChannels(force = true, onDone = done) },
+                                    onRemoved = chat::removeDiscord,
+                                )
+                            },
                             onWipe = { chat.wipeAll { destination = null } },
                             onClose = { destination = null },
                         )

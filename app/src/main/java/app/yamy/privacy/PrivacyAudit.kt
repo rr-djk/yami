@@ -36,13 +36,13 @@ class PrivacyAudit(
         return listOf(
             PrivacyCheck(
                 "Mode hors ligne",
-                !hasInternet || (offline && (silent || traffic < 0)),
+                !hasInternet || (offline && silent),
                 when {
                     !hasInternet -> "Aucune permission INTERNET : rien ne peut sortir du téléphone"
-                    offline && silent -> "0 octet échangé depuis le passage en Hors ligne (compteur réseau d'Android)"
-                    offline && traffic < 0 -> "Hors ligne (contrôle logiciel) : compteur réseau d'Android indisponible"
+                    offline && silent -> "0 octet échangé depuis le passage en Hors ligne ou le lancement de l'app (compteur réseau d'Android)"
+                    offline && traffic < 0 -> "Hors ligne (contrôle logiciel), mais non vérifiable : compteur réseau d'Android indisponible"
                     offline -> "⚠ Du trafic a été compté depuis le passage en Hors ligne : ${traffic - baseline} octets"
-                    discord.load() != null -> "Mode Connecté : les messages que tu confirmes partent sur Discord"
+                    discord.load() != null -> "Mode Connecté : Yamy contacte Discord pour lister les salons ; seuls les messages que tu confirmes y sont publiés"
                     else -> "Mode Connecté, aucun connecteur configuré"
                 },
             ),

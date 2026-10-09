@@ -17,6 +17,7 @@ import app.yamy.connect.NetworkMode
 import app.yamy.connect.NetworkModeStore
 import app.yamy.mcp.discord.DiscordConnector
 import app.yamy.mcp.discord.DiscordTokenStore
+import app.yamy.mcp.discord.PrefsChannelApprovals
 import app.yamy.memory.FileMemoryRepository
 import app.yamy.memory.MemoryRepository
 import app.yamy.memory.Scribe
@@ -48,7 +49,7 @@ class YamyApp : Application() {
     val networkMode: NetworkModeStore by lazy { NetworkModeStore(this) }
     val networkGate: NetworkGate by lazy { NetworkGate { networkMode.mode.value } }
     val discordToken: DiscordTokenStore by lazy { DiscordTokenStore(java.io.File(filesDir, "discord.key"), secretBox) }
-    val discord: DiscordConnector by lazy { DiscordConnector(discordToken, networkGate) }
+    val discord: DiscordConnector by lazy { DiscordConnector(discordToken, networkGate, PrefsChannelApprovals(this)) }
     val chainRunner: ChainRunner by lazy { ChainRunner(engine) }
     val imageSource: ImageSource by lazy { ContentResolverImageSource(this) }
     val secretBox: KeystoreSecretBox by lazy { KeystoreSecretBox() }

@@ -74,13 +74,18 @@ class DiscordMcpServer(private val api: DiscordApi) : McpServerHandler {
         private const val INVALID_PARAMS = -32602
 
         /** Caractères invisibles ou de sens d'écriture : ils permettraient de cacher du texte dans la carte de confirmation. */
-        private val HIDDEN = Regex("[\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2069\\uFEFF]|[\\p{Cc}&&[^\\n\\t]]")
+        private val HIDDEN = Regex("[\\p{Cf}\\p{Co}\\p{Cn}\\p{Zl}\\p{Zp}\\u3164\\u115F\\u1160\\uFFA0\\u2800]|[\\p{Cc}&&[^\\n\\t]]")
 
         /** Ce qui est affiché est exactement ce qui part : pas de longues suites de lignes vides. */
-        fun normalize(text: String) = text.replace("\r\n", "\n").replace(Regex("\n{3,}"), "\n\n").trim()
+        fun normalize(text: String) = text.replace("\r\n", "\n")
+            // Sélecteurs de variante et liants d'emoji : retirés (affichage quasi identique, plus de place pour cacher des données).
+            .replace(Regex("[\\uFE00-\\uFE0F\\u200D]"), "")
+            .replace(Regex("[ \\t\\u00A0]+\n"), "\n")
+            .replace(Regex("\n{3,}"), "\n\n")
+            .trim()
 
         fun validate(channelId: String, text: String): String? = when {
-            channelId.isEmpty() || !channelId.all { it.isDigit() } -> "Salon invalide."
+            !DiscordNames.isSnowflake(channelId) -> "Salon invalide."
             text.isBlank() -> "Le message est vide."
             text.length > MAX_LENGTH -> "Le message dépasse $MAX_LENGTH caractères (limite de Discord)."
             HIDDEN.containsMatchIn(text) -> "Caractères invisibles refusés."
