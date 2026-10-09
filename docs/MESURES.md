@@ -35,3 +35,24 @@ Captures : `mesures/etape3-cpu.png`, `mesures/etape3-gpu.png`.
 - Température : +5,3 °C en 5 minutes, jamais au-delà de 35,1 °C (tiède, pas brûlant).
 - Débit : ~12-13 morceaux/s au début, entre 6 et 10 ensuite (baisse probable due à la chaleur, non prouvée), sans interruption ni plantage sur 34 réponses.
 - Non mesuré : consommation de batterie (téléphone en charge), température du processeur (seule la batterie est lisible sans permission).
+
+## Voix (v0.2) — Gemma 4 E2B écoute l'audio, CPU, Pixel 10a
+`AudioProbeTest` (fichier brut : `audio-probe.tsv`). Voix de synthèse française hors ligne du téléphone, rééchantillonnée en 16 kHz mono.
+
+| Audio | Transcription : 1er mot / total | Réponse directe à l'audio : 1er mot / total |
+|---|---|---|
+| 3,8 s | 3,0 s / 4,1 s | 5,8 s / 8,4 s |
+| 12,5 s | 4,1 s / 8,3 s | 7,1 s / 15,0 s |
+
+- Transcription quasi mot pour mot avec un prompt dédié (seul « Yamy » devient « Yami » / « ami »). Avec la personnalité de Yamy dans le prompt, le modèle répond au lieu de transcrire.
+- Coût fixe ≈ 3 s par appel audio : découper en petits morceaux **augmente** le temps total. On découpe seulement les longs messages, sur les pauses, pour transcrire pendant que la personne parle encore (attente perçue réduite).
+- Choix : transcription puis réponse (≈ +1,5 s) pour garder la détection de détresse sur le texte, afficher les mots en direct et conserver l'historique en texte.
+
+## Chaînes d'agents et Scribe (v0.2)
+`ChainProbeTest` / `ScribeProbeTest` (fichiers bruts : `chain-probe.txt`, `scribe-probe.txt`).
+
+| Tâche | Durée |
+|---|---|
+| Le Conseil (3 agents) | 31 s |
+| Révision (3 agents, texte) | 30 s |
+| Scribe (3 messages → 1 note) | 5,8 s |
