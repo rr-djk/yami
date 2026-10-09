@@ -3,9 +3,7 @@
     <string name="app_name">Yamy</string>
     <string name="tagline">Dis-lui tout. Rien ne quitte ton téléphone.</string>
     <string name="welcome_title">Salut, c\'est Yamy.</string>
-    <string name="welcome_body">Comment puis-je t\'aider aujourd\'hui ?
-
-De quoi as-tu envie de parler : une journée à raconter, une question, un souci, une photo à me montrer ? Je suis là, prends ton temps.</string>
+    <string name="welcome_body">Comment puis-je t\'aider ? De quoi veux-tu parler ?</string>
     <string name="input_hint">Écris à Yamy…</string>
     <string name="send">Envoyer</string>
     <string name="clear_conversation">Effacer</string>
