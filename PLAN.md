@@ -1,4 +1,4 @@
-# PLAN.md — Yamy, un ami IA 100 % local (Android)
+# PLAN.md — Yamy, un ami IA hors ligne par défaut (Android)
 
 Hackathon : **Best Use of Gemma 4** (Google DeepMind). Durée : **8 h**.
 Appareil de test : **Pixel 10a** (USB). Développeur débutant Android, assisté par IA. Build en **ligne de commande** (pas d'Android Studio).
@@ -12,7 +12,7 @@ Appareil de test : **Pixel 10a** (USB). Développeur débutant Android, assisté
 Yamy est un compagnon conversationnel qui tourne **entièrement sur le téléphone**. Rien ne quitte l'appareil.
 
 **Promesse vérifiable :**
-1. Aucune permission INTERNET dans le manifeste.
+1. Hors ligne par défaut : aucune donnée ne sort tant que le switch est sur Hors ligne (v0.1-v0.2 : aucune permission INTERNET ; v0.3 : permission déclarée pour les seuls connecteurs MCP).
 2. Démo **en mode avion**.
 3. Sauvegarde cloud désactivée, captures bloquées, verrouillage biométrique.
 4. Bouton « Tout effacer ».
@@ -100,7 +100,7 @@ Yamy est un compagnon conversationnel qui tourne **entièrement sur le télépho
 
 ## 6. Checklist confidentialité
 
-- [x] Aucune permission INTERNET.
+- [x] Hors ligne par défaut ; réseau réservé aux connecteurs MCP, en mode Connecté, avec confirmation de chaque envoi.
 - [ ] Fonctionne en mode avion (aucun accès réseau dans le code ; test manuel à faire).
 - [x] `allowBackup=false`.
 - [x] `FLAG_SECURE`.
@@ -163,4 +163,5 @@ Tester aussi les tentatives de contournement des consignes. Afficher « X / N ac
 | 12 | Micro : transcription Gemma pendant la parole, puis réponse ; voix TTS hors ligne seulement | Mesures `docs/MESURES.md` ; détresse vérifiée sur le texte ; aucune donnée envoyée en ligne |
 | 13 | Chaînes d'agents orchestrées en code (Le Conseil, Révision, Entretien) | Petit modèle : enchaînement déterministe plus fiable ; ~30 s par chaîne |
 | 14 | Mémoire façon Obsidian (index + notes reliées chiffrées, Scribe annulable, outil lireNote) | Schéma « LLM Wiki » de Karpathy, déclenché à la demande (« 📝 Retenir ») |
+| 15 | Connecteurs MCP : serveur Gmail porté dans l'app + switch logiciel Hors ligne/Connecté (choix utilisateur : une seule app) | Android ne lance pas de serveur stdio Java ; promesse reformulée honnêtement (« hors ligne par défaut ») |
 | 3 | Backend CPU par défaut ; Kotlin 2.4.0 (imposé par LiteRT-LM 0.18.0) | Chargement 0,8 s vs 51,6 s, débit équivalent, moins de mémoire (voir `docs/MESURES.md`) |

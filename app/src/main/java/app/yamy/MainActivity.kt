@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import app.yamy.privacy.LockScreen
 import app.yamy.privacy.PrivacyScreen
+import app.yamy.privacy.ConnectorsSection
 import app.yamy.skills.SkillsScreen
 import app.yamy.skills.SkillsViewModel
 import app.yamy.ui.theme.YamyTheme
@@ -84,12 +85,20 @@ class MainActivity : FragmentActivity() {
         var tab by rememberSaveable { mutableStateOf(Tab.SESSIONS) }
         val chat = viewModel<ChatViewModel>(
             factory = factory {
-                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe)
+                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe, app.networkMode, app.gmail)
             },
         )
         if (inChat) {
             BackHandler { inChat = false }
-            ChatScreen(chat, app.modelLocator.modelFile.path, onBack = { inChat = false })
+            ChatScreen(
+                chat,
+                app.modelLocator.modelFile.path,
+                onBack = { inChat = false },
+                onOpenConnectors = {
+                    tab = Tab.PRIVACY
+                    inChat = false
+                },
+            )
             return
         }
         BackHandler(enabled = tab != Tab.SESSIONS) { tab = Tab.SESSIONS }
@@ -113,6 +122,7 @@ class MainActivity : FragmentActivity() {
                     }
                     Tab.PRIVACY -> PrivacyScreen(
                         audit = app.privacyAudit,
+                        connectors = { ConnectorsSection(app.networkMode, app.gmailCredentials) },
                         onWipe = { chat.wipeAll { tab = Tab.SESSIONS } },
                         onClose = { tab = Tab.SESSIONS },
                     )

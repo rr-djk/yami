@@ -31,6 +31,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        resources.excludes += setOf("META-INF/NOTICE.md", "META-INF/LICENSE.md")
+    }
+
     buildFeatures {
         compose = true
     }
@@ -59,7 +63,11 @@ dependencies {
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.sqlcipher.android)
     implementation(libs.androidx.sqlite)
+    implementation(libs.android.mail)
+    implementation(libs.android.activation)
     testImplementation(libs.junit)
+    // org.json est fourni par Android ; en test JVM il faut la vraie implémentation.
+    testImplementation(libs.org.json)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
