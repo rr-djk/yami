@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import app.yamy.bench.BenchScreen
+import app.yamy.bench.BenchViewModel
 import app.yamy.ui.theme.YamyTheme
 
 class MainActivity : ComponentActivity() {
@@ -26,7 +29,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             YamyTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                    HelloScreen()
+                    BenchScreen(viewModel<BenchViewModel>())
                 }
             }
         }
