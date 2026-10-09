@@ -14,6 +14,12 @@ import app.yamy.safety.TurnPlanner
 import app.yamy.skills.SkillPrompt
 import app.yamy.skills.SkillRepository
 import app.yamy.vision.ImageSource
+import app.yamy.voice.SegmenterEvent
+import app.yamy.voice.Speaker
+import app.yamy.voice.VoiceRecorder
+import app.yamy.voice.Wav
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,7 +38,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-enum class EngineStatus { LOADING, READY, GENERATING, MODEL_MISSING, ERROR }
+enum class EngineStatus { LOADING, READY, LISTENING, GENERATING, MODEL_MISSING, ERROR }
+
+/** Écoute en cours : niveaux récents pour l'onde, durée, et texte déjà transcrit. */
+data class VoiceUi(val levels: List<Float> = emptyList(), val seconds: Int = 0, val transcript: String = "")
 
 /** Photo en attente d'envoi, gardée en mémoire seulement. */
 class PendingImage(val bytes: ByteArray)
@@ -45,6 +54,7 @@ data class ChatUiState(
     val error: String? = null,
     val pendingImage: PendingImage? = null,
     val session: Session? = null,
+    val voice: VoiceUi? = null,
 )
 
 class ChatViewModel(
@@ -56,6 +66,8 @@ class ChatViewModel(
     private val skills: SkillRepository,
     private val wiper: DataWiper,
     private val sessions: SessionRepository,
+    private val recorder: VoiceRecorder,
+    private val speaker: Speaker,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -64,6 +76,11 @@ class ChatViewModel(
     private val error = MutableStateFlow<String?>(null)
     private val pendingImage = MutableStateFlow<PendingImage?>(null)
     private val currentSession = MutableStateFlow<Session?>(null)
+    private val voice = MutableStateFlow<VoiceUi?>(null)
+    private var voiceJob: Job? = null
+
+    /** Yamy est en train de parler (réponse à un message vocal). */
+    val speaking: StateFlow<Boolean> = speaker.speaking
 
     /** Toutes les discussions, la plus récente en premier. */
     val sessionList: StateFlow<List<Session>> =
@@ -79,8 +96,8 @@ class ChatViewModel(
     }
 
     val state: StateFlow<ChatUiState> =
-        combine(combine(messages, draft, status, error, pendingImage) { m, d, s, e, p -> ChatUiState(m, d, s, e, p) }, currentSession) { ui, session ->
-            ui.copy(session = session)
+        combine(combine(messages, draft, status, error, pendingImage) { m, d, s, e, p -> ChatUiState(m, d, s, e, p) }, currentSession, voice) { ui, session, v ->
+            ui.copy(session = session, voice = v)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     init {
@@ -144,13 +161,88 @@ class ChatViewModel(
         val image = pendingImage.value
         val prompt = text.trim().ifEmpty { if (image != null) DEFAULT_IMAGE_PROMPT else return }
         if (status.value != EngineStatus.READY) return
+        launchTurn(prompt, image, viaVoice = false)
+    }
+
+    /**
+     * Écoute au micro : chaque morceau (coupé sur une pause) est transcrit par Gemma pendant que la
+     * personne continue de parler ; à la fin, le texte complet part comme un message normal
+     * (détection de détresse comprise), et la réponse est lue à voix haute.
+     */
+    fun startListening() {
+        if (status.value != EngineStatus.READY) return
+        speaker.stop()
+        error.value = null
+        status.value = EngineStatus.LISTENING
+        voice.value = VoiceUi()
+        voiceJob = viewModelScope.launch {
+            val segments = Channel<ShortArray>(Channel.UNLIMITED)
+            val transcript = StringBuilder()
+            try {
+                coroutineScope {
+                    launch {
+                        for (segment in segments) {
+                            val before = transcript.length
+                            engine.streamOnce(TRANSCRIBE_PROMPT, ChatInput(TRANSCRIBE_REQUEST, audio = Wav.encode(segment))).collect { piece ->
+                                transcript.append(piece)
+                                voice.value = voice.value?.copy(transcript = transcript.toString())
+                            }
+                            if (transcript.length > before) transcript.append(' ')
+                        }
+                    }
+                    var frames = 0
+                    recorder.record().collect { event ->
+                        when (event) {
+                            is SegmenterEvent.Level -> {
+                                frames++
+                                voice.value = voice.value?.let {
+                                    it.copy(levels = (it.levels + event.value).takeLast(LEVEL_BARS), seconds = frames / 10)
+                                }
+                            }
+                            is SegmenterEvent.Segment -> segments.send(event.samples)
+                            SegmenterEvent.Finished -> segments.close()
+                        }
+                    }
+                    segments.close()
+                }
+                val text = transcript.toString().trim()
+                voice.value = null
+                status.value = EngineStatus.READY
+                if (text.isEmpty()) {
+                    error.value = "Je n'ai rien entendu. Réessaie en parlant un peu plus près du téléphone."
+                } else {
+                    launchTurn(text, image = null, viaVoice = true)
+                }
+            } catch (e: CancellationException) {
+                voice.value = null
+                if (status.value == EngineStatus.LISTENING) status.value = EngineStatus.READY
+                throw e
+            } catch (e: Throwable) {
+                voice.value = null
+                status.value = EngineStatus.READY
+                error.value = "Micro : ${e.message}"
+            }
+        }
+    }
+
+    /** Termine l'écoute : le dernier morceau est transcrit puis envoyé. */
+    fun stopListening() = recorder.stop()
+
+    /** Abandonne l'écoute sans rien envoyer. */
+    fun cancelListening() {
+        voiceJob?.cancel()
+    }
+
+    fun stopSpeaking() = speaker.stop()
+
+    private fun launchTurn(prompt: String, image: PendingImage?, viaVoice: Boolean) {
         generation = viewModelScope.launch {
             status.value = EngineStatus.GENERATING
             error.value = null
             draft.value = ""
             pendingImage.value = null
             val session = currentSession.value ?: sessions.mostRecentOrCreate().also { currentSession.value = it }
-            repository.add(ChatMessage(sessionId = session.id, role = Role.USER, text = prompt, hasImage = image != null))
+            repository.add(ChatMessage(sessionId = session.id, role = Role.USER, text = prompt, hasImage = image != null, viaVoice = viaVoice))
             sessions.touch(session.id)
             if (session.title == Session.DEFAULT_TITLE) {
                 // Titre automatique : le début du premier message.
@@ -163,6 +255,7 @@ class ChatViewModel(
                 // Détresse aiguë : réponse fixe écrite en code, sans passer par le modèle.
                 repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = plan.reply))
                 status.value = EngineStatus.READY
+                if (viaVoice) speaker.speak(plan.reply)
                 return@launch
             }
             val textForModel = (plan as TurnPlan.Model).textForModel
@@ -178,6 +271,7 @@ class ChatViewModel(
                     if (reply.isNotBlank()) repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = reply.toString()))
                 }
                 status.value = EngineStatus.READY
+                if (viaVoice) speaker.speak(reply.toString())
             } catch (e: CancellationException) {
                 draft.value = ""
                 throw e
@@ -195,6 +289,8 @@ class ChatViewModel(
      * Ne peut pas être annulé en cours de route.
      */
     fun wipeAll(onDone: () -> Unit) {
+        voiceJob?.cancel()
+        speaker.stop()
         val running = generation
         viewModelScope.launch(NonCancellable) {
             running?.cancelAndJoin()
@@ -212,6 +308,7 @@ class ChatViewModel(
 
     /** Efface la conversation affichée et repart d'un contexte vierge. */
     fun clearConversation() {
+        voiceJob?.cancel()
         val running = generation
         viewModelScope.launch {
             running?.cancelAndJoin()
@@ -253,6 +350,8 @@ class ChatViewModel(
     }
 
     private fun switchTo(onOpened: () -> Unit = {}, target: suspend () -> Session?) {
+        voiceJob?.cancel()
+        speaker.stop()
         val running = generation
         viewModelScope.launch {
             running?.cancelAndJoin()
@@ -311,6 +410,11 @@ class ChatViewModel(
     companion object {
         private const val HISTORY_TURNS = 20
         private const val TITLE_LENGTH = 40
+        private const val LEVEL_BARS = 24
+        private const val TRANSCRIBE_REQUEST = "Transcris cet audio."
+        private const val TRANSCRIBE_PROMPT =
+            "Tu es un outil de transcription. Écris uniquement, mot pour mot, ce qui est dit dans l'audio. Aucune réponse, aucun commentaire."
+
         private const val DEFAULT_IMAGE_PROMPT = "Regarde cette photo et dis-moi ce que tu en penses."
     }
 }

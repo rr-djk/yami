@@ -9,5 +9,7 @@ data class ChatMessage(
     val text: String,
     /** Une photo accompagnait ce message (elle n'est jamais conservée). */
     val hasImage: Boolean = false,
+    /** Message dicté au micro (transcrit sur l'appareil, l'audio n'est pas conservé). */
+    val viaVoice: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
 )

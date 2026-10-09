@@ -53,4 +53,12 @@
     <string name="tab_privacy">Vie privée</string>
     <string name="memory_title">Mémoire</string>
     <string name="memory_soon">Bientôt : ce que Yamy retient de vos discussions, en notes reliées que tu pourras lire, corriger et supprimer.</string>
+    <string name="mic">🎙️</string>
+    <string name="mic_description">Parler à Yamy</string>
+    <string name="listening">Je t\'écoute…</string>
+    <string name="listening_hint">Parle naturellement : je m\'arrête tout seul quand tu fais une pause.</string>
+    <string name="finish_listening">Terminer</string>
+    <string name="stop_speaking">🔇 Couper la voix</string>
+    <string name="voice_label">🎙️ Message vocal</string>
+    <string name="mic_denied">Le micro est nécessaire pour parler à Yamy. Tu peux l\'autoriser dans les réglages.</string>
 </resources>
