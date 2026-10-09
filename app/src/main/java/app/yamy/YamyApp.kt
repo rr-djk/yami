@@ -12,6 +12,11 @@ import app.yamy.engine.ModelLocator
 import app.yamy.persona.AssetPersonaProvider
 import app.yamy.persona.PersonaProvider
 import app.yamy.agents.ChainCatalog
+import app.yamy.connect.NetworkGate
+import app.yamy.connect.NetworkMode
+import app.yamy.connect.NetworkModeStore
+import app.yamy.mcp.GmailConnector
+import app.yamy.mcp.GmailCredentialStore
 import app.yamy.memory.FileMemoryRepository
 import app.yamy.memory.MemoryRepository
 import app.yamy.memory.Scribe
@@ -40,15 +45,23 @@ class YamyApp : Application() {
     val speaker: Speaker by lazy { Speaker(this) }
     val memory: MemoryRepository by lazy { FileMemoryRepository(java.io.File(filesDir, "memoire"), secretBox) }
     val scribe: Scribe by lazy { Scribe(engine, memory) }
+    val networkMode: NetworkModeStore by lazy { NetworkModeStore(this) }
+    val networkGate: NetworkGate by lazy { NetworkGate { networkMode.mode.value } }
+    val gmailCredentials: GmailCredentialStore by lazy { GmailCredentialStore(java.io.File(filesDir, "gmail.key"), secretBox) }
+    val gmail: GmailConnector by lazy { GmailConnector(gmailCredentials, networkGate) }
     val chainRunner: ChainRunner by lazy { ChainRunner(engine) }
     val imageSource: ImageSource by lazy { ContentResolverImageSource(this) }
     val secretBox: KeystoreSecretBox by lazy { KeystoreSecretBox() }
     val appLock: AppLock by lazy { AppLock(this) }
-    val privacyAudit: PrivacyAudit by lazy { PrivacyAudit(this, secretBox, appLock) }
+    val privacyAudit: PrivacyAudit by lazy { PrivacyAudit(this, secretBox, appLock, networkMode, gmailCredentials) }
     private val database: AppDatabase by lazy { AppDatabase.create(this, databasePassphrase()) }
     val conversations: ConversationRepository by lazy { RoomConversationRepository(database.messageDao()) }
     val sessions: SessionRepository by lazy { RoomSessionRepository(database) }
-    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir, memory) { ChainCatalog.installDefaults(assets, skills) } }
+    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir, memory) {
+            ChainCatalog.installDefaults(assets, skills)
+            gmailCredentials.clear()
+            networkMode.set(NetworkMode.OFFLINE)
+        } }
 
     override fun onCreate() {
         super.onCreate()
@@ -72,6 +85,7 @@ class YamyApp : Application() {
             secretBox.destroyKey()
             java.io.File(filesDir, "skills").deleteRecursively()
             java.io.File(filesDir, "memoire").deleteRecursively()
+            java.io.File(filesDir, "gmail.key").delete()
             store.get()
         }
     }

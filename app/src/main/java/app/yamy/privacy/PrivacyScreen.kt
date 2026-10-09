@@ -34,10 +34,10 @@ import app.yamy.ui.components.RetroTextButton
 import app.yamy.ui.theme.RetroColors
 
 @Composable
-fun PrivacyScreen(audit: PrivacyAudit, onWipe: () -> Unit, onClose: () -> Unit) {
+fun PrivacyScreen(audit: PrivacyAudit, connectors: @Composable () -> Unit, onWipe: () -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
     val flags = (context as Activity).window.attributes.flags
-    val checks = remember { audit.run(flags) }
+    val checks = audit.run(flags)
     var confirming by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -50,6 +50,7 @@ fun PrivacyScreen(audit: PrivacyAudit, onWipe: () -> Unit, onClose: () -> Unit) 
         }
         RetroRule()
         Text(stringResource(R.string.privacy_intro), style = MaterialTheme.typography.bodyLarge)
+        connectors()
         checks.forEach { CheckRow(it) }
         Text(stringResource(R.string.privacy_limits), style = MaterialTheme.typography.bodyMedium)
         RetroButton(onClick = { confirming = true }) { Text(stringResource(R.string.wipe_all)) }

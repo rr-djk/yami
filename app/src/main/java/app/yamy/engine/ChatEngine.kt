@@ -1,5 +1,6 @@
 package app.yamy.engine
 
+import app.yamy.mcp.EmailDrafts
 import app.yamy.skills.SkillLookup
 import kotlinx.coroutines.flow.Flow
 
@@ -36,6 +37,7 @@ interface ChatEngine : AutoCloseable {
         history: List<Turn> = emptyList(),
         skills: SkillLookup? = null,
         notes: SkillLookup? = null,
+        emailDrafts: EmailDrafts? = null,
     )
 
     /**

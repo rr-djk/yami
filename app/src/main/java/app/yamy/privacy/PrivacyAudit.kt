@@ -5,6 +5,9 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.view.WindowManager
 import java.io.File
+import app.yamy.connect.NetworkMode
+import app.yamy.connect.NetworkModeStore
+import app.yamy.mcp.GmailCredentialStore
 
 /** Une vérification de confidentialité, calculée en direct sur l'appareil. */
 data class PrivacyCheck(val label: String, val passed: Boolean, val detail: String)
@@ -14,11 +17,14 @@ class PrivacyAudit(
     private val context: Context,
     private val box: KeystoreSecretBox,
     private val lock: AppLock,
+    private val network: NetworkModeStore,
+    private val gmail: GmailCredentialStore,
 ) {
     fun run(windowFlags: Int): List<PrivacyCheck> {
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         val permissions = info.requestedPermissions.orEmpty().map { it.substringAfterLast('.') }
         val hasInternet = permissions.contains("INTERNET")
+        val offline = network.mode.value == NetworkMode.OFFLINE
         val backupAllowed = (context.applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP) != 0
         val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         val leftovers = File(context.cacheDir, "camera").list().orEmpty().isNotEmpty() ||
@@ -26,9 +32,14 @@ class PrivacyAudit(
         val encrypted = box.hasKey() && !leftovers
         return listOf(
             PrivacyCheck(
-                "Aucun accès à Internet",
-                !hasInternet,
-                if (hasInternet) "Permission INTERNET déclarée" else "Permission INTERNET absente du manifeste",
+                "Mode hors ligne",
+                offline,
+                when {
+                    !hasInternet -> "Aucune permission INTERNET : rien ne peut sortir du téléphone"
+                    offline -> "Le modèle tourne sur le téléphone. Les connecteurs (Gmail) sont coupés : rien ne sort"
+                    gmail.load() != null -> "Mode Connecté : seuls les emails que tu confirmes sortent, via Gmail"
+                    else -> "Mode Connecté, mais aucun connecteur configuré : rien ne sort"
+                },
             ),
             PrivacyCheck(
                 "Sauvegarde cloud désactivée",

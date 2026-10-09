@@ -73,4 +73,22 @@
     <string name="memory_summary">Résumé (une ligne)</string>
     <string name="memory_content">Contenu (liens : [[nom]])</string>
     <string name="links_label">Liée à : %1$s</string>
+    <string name="mode_offline">🔒 Hors ligne : rien ne quitte ton téléphone</string>
+    <string name="mode_connected">🌐 Connecté : les connecteurs peuvent sortir</string>
+    <string name="connectors_title">Connecteurs (MCP)</string>
+    <string name="connected_mode">Mode connecté</string>
+    <string name="connected_mode_detail">Hors ligne par défaut. Connecté, Yamy peut préparer des emails via ton serveur MCP Gmail : tu relis et confirmes chaque envoi. Le modèle, lui, reste toujours sur le téléphone.</string>
+    <string name="connect_confirm_title">Passer en mode Connecté ?</string>
+    <string name="connect_confirm_text">Seul le contenu des emails que tu confirmes quittera le téléphone, via Gmail. Tes discussions, ta mémoire et le modèle restent ici.</string>
+    <string name="connect_yes">Me connecter</string>
+    <string name="gmail_address">Adresse Gmail</string>
+    <string name="gmail_password">Mot de passe d\'application Google</string>
+    <string name="gmail_configured">Gmail configuré : %1$s</string>
+    <string name="gmail_remove">Retirer Gmail</string>
+    <string name="email_card_title">📧 Yamy propose d\'envoyer cet email</string>
+    <string name="email_to">À : %1$s</string>
+    <string name="email_subject">Sujet : %1$s</string>
+    <string name="email_send">Envoyer</string>
+    <string name="email_sending">Envoi…</string>
+    <string name="email_offline">Repasse en mode Connecté pour envoyer.</string>
 </resources>

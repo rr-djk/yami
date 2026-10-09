@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Volontairement AUCUNE permission réseau : pas d'INTERNET (promesse de confidentialité). -->
+    <!-- Réseau : utilisé UNIQUEMENT par les connecteurs (MCP), seulement en mode Connecté (switch dans
+         Vie privée, Hors ligne par défaut) et après confirmation de chaque envoi. Le modèle reste local. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Micro : utilisé seulement pendant que l'on parle à Yamy ; l'audio reste en mémoire. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 

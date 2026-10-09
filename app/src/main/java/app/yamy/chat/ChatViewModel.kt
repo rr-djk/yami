@@ -21,6 +21,12 @@ import app.yamy.memory.MemoryFormat
 import app.yamy.memory.MemoryRepository
 import app.yamy.memory.Scribe
 import app.yamy.memory.ScribeResult
+import app.yamy.connect.NetworkMode
+import app.yamy.connect.NetworkModeStore
+import app.yamy.mcp.EmailDraft
+import app.yamy.mcp.EmailDrafts
+import app.yamy.mcp.GmailConnector
+import app.yamy.mcp.gmail.GmailMcpServer
 import app.yamy.vision.ImageSource
 import app.yamy.voice.SegmenterEvent
 import app.yamy.voice.Speaker
@@ -38,6 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -86,6 +93,8 @@ class ChatViewModel(
     private val chainRunner: ChainRunner,
     private val memory: MemoryRepository,
     private val scribe: Scribe,
+    private val network: NetworkModeStore,
+    private val gmail: GmailConnector,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -97,6 +106,26 @@ class ChatViewModel(
     private val voice = MutableStateFlow<VoiceUi?>(null)
     private val chainRun = MutableStateFlow<ChainRunUi?>(null)
     private val _scribe = MutableStateFlow<ScribeUi?>(null)
+    private val _pendingEmail = MutableStateFlow<EmailDraft?>(null)
+    private val _sendingEmail = MutableStateFlow(false)
+
+    /** Email proposé par Gemma, en attente de la décision de la personne. */
+    val pendingEmail: StateFlow<EmailDraft?> = _pendingEmail
+    val sendingEmail: StateFlow<Boolean> = _sendingEmail
+
+    /** Hors ligne (défaut) ou Connecté : affiché en permanence dans le chat. */
+    val networkMode: StateFlow<NetworkMode> = network.mode
+
+    /** Gemma propose seulement : rien ne part sans le bouton Envoyer. Appelé par l'outil, sur un fil natif. */
+    private val drafts = EmailDrafts { draft ->
+        val problem = GmailMcpServer.validate(draft.to, draft.subject, draft.body)
+        if (problem != null) {
+            "Brouillon refusé : $problem"
+        } else {
+            _pendingEmail.value = draft
+            "Brouillon prêt. Dis à la personne de le relire : elle seule peut confirmer l'envoi avec le bouton Envoyer."
+        }
+    }
 
     /** Passage du Scribe : en cours, ou terminé avec les notes écrites (annulable). */
     val scribeState: StateFlow<ScribeUi?> = _scribe
@@ -116,6 +145,7 @@ class ChatViewModel(
     /** Sérialise les opérations qui touchent à la conversation du moteur (envoi, effacement, reprise). */
     private val conversationLock = Mutex()
     private var notesAvailable = false
+    private var emailEnabled = false
 
     /** Discussion dont le contexte est chargé dans le moteur : un tour la recharge si elle a changé. */
     private var conversationSessionId: Long? = null
@@ -134,6 +164,13 @@ class ChatViewModel(
 
     init {
         viewModelScope.launch { prepareEngine() }
+        // Changer de mode recharge les outils et le prompt au prochain tour ; repasser Hors ligne annule tout brouillon.
+        viewModelScope.launch {
+            network.mode.drop(1).collect { mode ->
+                engine.invalidateConversation()
+                if (mode == NetworkMode.OFFLINE) _pendingEmail.value = null
+            }
+        }
     }
 
     private suspend fun prepareEngine() {
@@ -163,12 +200,20 @@ class ChatViewModel(
                 memoryIndex = MemoryFormat.index(notes)
                 notes.isNotEmpty()
             }
+            val canEmail = network.mode.value == NetworkMode.CONNECTED && gmail.isConfigured
+            emailEnabled = canEmail
             val base = persona.systemPrompt() +
                 session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty() +
                 memoryIndex.takeIf { it.isNotBlank() }?.let {
                     "\n\n## Ce que tu sais déjà de la personne (tes notes)\n$it\n" +
                         "Si un détail t'aide à répondre, appelle l'outil lireNote avec le nom de la note. N'invente rien au-delà."
-                }.orEmpty()
+                }.orEmpty() +
+                (if (canEmail) {
+                    "\n\n## Email (mode Connecté)\nSi la personne te demande d'envoyer un email, appelle l'outil preparerEmail. " +
+                        "Tu n'envoies rien toi-même : la personne relit et confirme. N'invente jamais d'adresse."
+                } else {
+                    ""
+                })
             SkillPrompt.withSkills(base, all) to all
         }
         engine.startConversation(
@@ -176,6 +221,7 @@ class ChatViewModel(
             history,
             skills.takeIf { available.any { !it.isChain } },
             memory.takeIf { notesAvailable },
+            drafts.takeIf { emailEnabled },
         )
         conversationSessionId = session.id
     }
@@ -364,6 +410,30 @@ class ChatViewModel(
         _scribe.value = null
     }
 
+    /** La personne confirme : l'email part via le connecteur MCP Gmail (refusé en mode Hors ligne). */
+    fun confirmEmail() {
+        val draft = _pendingEmail.value ?: return
+        if (_sendingEmail.value) return
+        viewModelScope.launch {
+            _sendingEmail.value = true
+            val text = try {
+                val result = withContext(Dispatchers.IO) { gmail.send(draft) }
+                if (result.isError) "📧 L'email n'est pas parti : ${result.text}" else "📧 Email envoyé à ${draft.to} (« ${draft.subject} »)."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                "📧 L'email n'est pas parti : ${e.message}"
+            }
+            _sendingEmail.value = false
+            _pendingEmail.value = null
+            currentSession.value?.let { repository.add(ChatMessage(sessionId = it.id, role = Role.YAMY, text = text)) }
+        }
+    }
+
+    fun cancelEmail() {
+        _pendingEmail.value = null
+    }
+
     /** Termine l'écoute : le dernier morceau est transcrit puis envoyé. */
     fun stopListening() = recorder.stop()
 
@@ -523,6 +593,7 @@ class ChatViewModel(
         chainRun.value = null
         voice.value = null
         _scribe.value = null
+        _pendingEmail.value = null
         draft.value = ""
         error.value = null
         pendingImage.value = null

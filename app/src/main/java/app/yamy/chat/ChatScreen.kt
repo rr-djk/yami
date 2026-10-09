@@ -65,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.yamy.R
+import app.yamy.connect.NetworkMode
 import app.yamy.vision.ContentResolverImageSource
 import app.yamy.ui.components.RetroButton
 import app.yamy.ui.components.RetroCard
@@ -77,7 +78,7 @@ import app.yamy.ui.theme.TechnicalTextStyle
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) {
+fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, onOpenConnectors: () -> Unit) {
     val ui by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
@@ -99,6 +100,9 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
     val focusManager = LocalFocusManager.current
     val speaking by viewModel.speaking.collectAsState()
     val scribe by viewModel.scribeState.collectAsState()
+    val network by viewModel.networkMode.collectAsState()
+    val pendingEmail by viewModel.pendingEmail.collectAsState()
+    val sendingEmail by viewModel.sendingEmail.collectAsState()
     var micDenied by rememberSaveable { mutableStateOf(false) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         micDenied = !granted
@@ -156,6 +160,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
             RetroTextButton(onClick = viewModel::rememberSession, label = stringResource(R.string.remember), enabled = ui.status == EngineStatus.READY && ui.messages.isNotEmpty())
             RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
         }
+        NetworkIndicator(network, onOpenConnectors)
         RetroRule()
         if (ui.status == EngineStatus.LOADING || ui.status == EngineStatus.GENERATING) {
             LinearProgressIndicator(
@@ -193,6 +198,9 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
             ui.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = TechnicalTextStyle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
+        }
+        pendingEmail?.let {
+            EmailConfirmCard(it, connected = network == NetworkMode.CONNECTED, sending = sendingEmail, onSend = viewModel::confirmEmail, onCancel = viewModel::cancelEmail)
         }
         scribe?.let { ScribeBanner(it, onUndo = viewModel::undoRemember, onDismiss = viewModel::dismissScribe) }
         if (micDenied) {
