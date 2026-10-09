@@ -1,6 +1,12 @@
 # Yamy
 
-Compagnon IA Android **100 % local** : Gemma-4-E2B-it exécuté sur l'appareil via LiteRT-LM. Aucune permission `INTERNET`, aucun réseau. Cible : Pixel 10a (hackathon *Best Use of Gemma 4*).
+Compagnon IA Android **100 % local** : Gemma-4-E2B-it exécuté sur l'appareil via LiteRT-LM. Aucune permission `INTERNET`, aucun réseau. Cible : Pixel 10a.
+
+## Contexte
+
+Projet réalisé dans le cadre du **Hacktoberfest 26 de l'UQAM** ([Hacktoberfest Hack Day Montréal x AGEEI](https://www.mlh.com/events/hacktoberfest-hack-day-montreal-x-ageei/challenges/01a03b87-be22-9180-5e2d-b3beeb66666d)), pour le défi **Best Use of Gemma 4** (Google DeepMind) : construire un outil avec un modèle ouvert et léger, multimodal (texte et images).
+
+Yamy y répond ainsi : Gemma 4 E2B tourne sur le téléphone (poids ouverts, aucune API distante), comprend les photos qu'on lui montre, et sert d'outil ciblé pour parler en confiance. Texte de soumission : [`docs/SOUMISSION.md`](docs/SOUMISSION.md).
 
 Yamy est une IA, pas un professionnel de santé. La détresse est gérée dans le code, pas seulement dans le prompt.
 
