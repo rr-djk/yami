@@ -2,6 +2,8 @@ package app.yamy
 
 import android.app.Application
 import app.yamy.chat.ConversationRepository
+import app.yamy.chat.SessionRepository
+import app.yamy.data.RoomSessionRepository
 import app.yamy.data.AppDatabase
 import app.yamy.data.RoomConversationRepository
 import app.yamy.engine.ChatEngine
@@ -31,10 +33,10 @@ class YamyApp : Application() {
     val secretBox: KeystoreSecretBox by lazy { KeystoreSecretBox() }
     val appLock: AppLock by lazy { AppLock(this) }
     val privacyAudit: PrivacyAudit by lazy { PrivacyAudit(this, secretBox, appLock) }
-    val conversations: ConversationRepository by lazy {
-        RoomConversationRepository(AppDatabase.create(this, databasePassphrase()).messageDao())
-    }
-    val dataWiper: DataWiper by lazy { DataWiper(conversations, skills, engine, filesDir, cacheDir) }
+    private val database: AppDatabase by lazy { AppDatabase.create(this, databasePassphrase()) }
+    val conversations: ConversationRepository by lazy { RoomConversationRepository(database.messageDao()) }
+    val sessions: SessionRepository by lazy { RoomSessionRepository(database) }
+    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir) }
 
     override fun onCreate() {
         super.onCreate()

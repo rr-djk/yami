@@ -23,13 +23,19 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.yamy.chat.ChatScreen
 import app.yamy.chat.ChatViewModel
+import app.yamy.chat.SessionsScreen
+import app.yamy.memory.MemoryScreen
+import app.yamy.ui.nav.RetroBottomBar
+import app.yamy.ui.nav.Tab
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import app.yamy.privacy.LockScreen
 import app.yamy.privacy.PrivacyScreen
 import app.yamy.skills.SkillsScreen
 import app.yamy.skills.SkillsViewModel
 import app.yamy.ui.theme.YamyTheme
-
-private enum class Screen { CHAT, SKILLS, PRIVACY }
 
 class MainActivity : FragmentActivity() {
     private val app get() = application as YamyApp
@@ -67,30 +73,40 @@ class MainActivity : FragmentActivity() {
 
     @androidx.compose.runtime.Composable
     private fun Content() {
-        var screen by rememberSaveable { mutableStateOf(Screen.CHAT) }
+        // Le chat s'ouvre en plein écran (place pour le clavier) ; les autres écrans ont la barre de navigation.
+        var inChat by rememberSaveable { mutableStateOf(true) }
+        var tab by rememberSaveable { mutableStateOf(Tab.SESSIONS) }
         val chat = viewModel<ChatViewModel>(
-            factory = factory { ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper) },
+            factory = factory {
+                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions)
+            },
         )
-        when (screen) {
-            Screen.CHAT -> ChatScreen(
-                chat,
-                app.modelLocator.modelFile.path,
-                onOpenSkills = { screen = Screen.SKILLS },
-                onOpenPrivacy = { screen = Screen.PRIVACY },
-            )
-            Screen.SKILLS -> {
-                val skills = viewModel<SkillsViewModel>(factory = factory { SkillsViewModel(app.skills, app.skillCreator, app.engine) })
-                LaunchedEffect(Unit) { skills.refresh() }
-                BackHandler { screen = Screen.CHAT }
-                SkillsScreen(skills) { screen = Screen.CHAT }
-            }
-            Screen.PRIVACY -> {
-                BackHandler { screen = Screen.CHAT }
-                PrivacyScreen(
-                    audit = app.privacyAudit,
-                    onWipe = { chat.wipeAll { screen = Screen.CHAT } },
-                    onClose = { screen = Screen.CHAT },
-                )
+        if (inChat) {
+            BackHandler { inChat = false }
+            ChatScreen(chat, app.modelLocator.modelFile.path, onBack = { inChat = false })
+            return
+        }
+        BackHandler(enabled = tab != Tab.SESSIONS) { tab = Tab.SESSIONS }
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.surface,
+            bottomBar = { RetroBottomBar(tab) { tab = it } },
+        ) { inner ->
+            val content = Modifier.padding(inner).consumeWindowInsets(inner)
+            Box(modifier = content) {
+                when (tab) {
+                    Tab.SESSIONS -> SessionsScreen(chat, onOpenChat = { inChat = true })
+                    Tab.TOOLS -> {
+                        val skills = viewModel<SkillsViewModel>(factory = factory { SkillsViewModel(app.skills, app.skillCreator, app.engine) })
+                        LaunchedEffect(Unit) { skills.refresh() }
+                        SkillsScreen(skills) { tab = Tab.SESSIONS }
+                    }
+                    Tab.MEMORY -> MemoryScreen()
+                    Tab.PRIVACY -> PrivacyScreen(
+                        audit = app.privacyAudit,
+                        onWipe = { chat.wipeAll { tab = Tab.SESSIONS } },
+                        onClose = { tab = Tab.SESSIONS },
+                    )
+                }
             }
         }
     }
