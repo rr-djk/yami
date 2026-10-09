@@ -9,6 +9,9 @@ import app.yamy.engine.LiteRtChatEngine
 import app.yamy.engine.ModelLocator
 import app.yamy.persona.AssetPersonaProvider
 import app.yamy.persona.PersonaProvider
+import app.yamy.skills.FileSkillRepository
+import app.yamy.skills.SkillCreator
+import app.yamy.skills.SkillRepository
 import app.yamy.vision.ContentResolverImageSource
 import app.yamy.vision.ImageSource
 
@@ -17,6 +20,8 @@ class YamyApp : Application() {
     val modelLocator: ModelLocator by lazy { ModelLocator(this) }
     val engine: ChatEngine by lazy { LiteRtChatEngine(this, modelLocator) }
     val persona: PersonaProvider by lazy { AssetPersonaProvider(this) }
+    val skills: SkillRepository by lazy { FileSkillRepository(java.io.File(filesDir, "skills")) }
+    val skillCreator: SkillCreator by lazy { SkillCreator(engine) }
     val imageSource: ImageSource by lazy { ContentResolverImageSource(this) }
     val conversations: ConversationRepository by lazy {
         RoomConversationRepository(AppDatabase.create(this).messageDao())

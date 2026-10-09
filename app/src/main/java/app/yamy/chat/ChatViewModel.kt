@@ -8,6 +8,8 @@ import app.yamy.engine.ChatInput
 import app.yamy.engine.ModelLocator
 import app.yamy.engine.Turn
 import app.yamy.persona.PersonaProvider
+import app.yamy.skills.SkillPrompt
+import app.yamy.skills.SkillRepository
 import app.yamy.vision.ImageSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,7 @@ class ChatViewModel(
     private val persona: PersonaProvider,
     private val locator: ModelLocator,
     private val imageSource: ImageSource,
+    private val skills: SkillRepository,
 ) : ViewModel() {
 
     private val draft = MutableStateFlow("")
@@ -81,7 +84,11 @@ class ChatViewModel(
 
     private suspend fun restartConversation() {
         val history = normalized(repository.recent(HISTORY_TURNS)).map { Turn(it.role == Role.USER, it.text) }
-        engine.startConversation(withContext(Dispatchers.IO) { persona.systemPrompt() }, history)
+        val (prompt, available) = withContext(Dispatchers.IO) {
+            val all = skills.list()
+            SkillPrompt.withSkills(persona.systemPrompt(), all) to all
+        }
+        engine.startConversation(prompt, history, skills.takeIf { available.isNotEmpty() })
     }
 
     /** Prépare une photo choisie (galerie ou appareil) pour le prochain message. */
@@ -99,6 +106,9 @@ class ChatViewModel(
         pendingImage.value = null
     }
 
+    /** Vrai quand le moteur est libre : les skills ne peuvent être créés que dans ce cas. */
+    val isIdle: Boolean get() = status.value == EngineStatus.READY
+
     fun send(text: String) {
         val image = pendingImage.value
         val prompt = text.trim().ifEmpty { if (image != null) DEFAULT_IMAGE_PROMPT else return }
@@ -111,6 +121,7 @@ class ChatViewModel(
             val reply = StringBuilder()
             try {
                 conversationLock.withLock {
+                    if (!engine.hasConversation) restartConversation()
                     val input = ChatInput(prompt, listOfNotNull(image?.bytes))
                     engine.send(input).collect { piece ->
                         reply.append(piece)

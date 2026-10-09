@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import app.yamy.R
 
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, modelPath: String) {
+fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit) {
     val ui by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
@@ -81,7 +81,10 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-            TextButton(onClick = viewModel::clearConversation) { Text(stringResource(R.string.clear_conversation)) }
+            Row {
+                TextButton(onClick = onOpenSkills, enabled = ui.status == EngineStatus.READY) { Text(stringResource(R.string.skills)) }
+                TextButton(onClick = viewModel::clearConversation) { Text(stringResource(R.string.clear_conversation)) }
+            }
         }
         if (ui.status == EngineStatus.LOADING || ui.status == EngineStatus.GENERATING) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
