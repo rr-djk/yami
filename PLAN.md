@@ -146,4 +146,5 @@ Tester aussi les tentatives de contournement des consignes. Afficher « X / N ac
 | 0 | E2B uniquement, local pur, Gemma 3 retiré | Éligibilité « Gemma 4 », promesse de confidentialité |
 | 0 | Skills texte uniquement | Pas de permission supplémentaire, faisable en 8 h |
 | 4 | Chat validé sur le Pixel : streaming fluide, température OK, historique persistant | Test utilisateur (mode avion à confirmer à l'étape 7) |
+| 5 | Vision validée sur le Pixel (photo appareil + galerie, description correcte avec E2B/CPU) | Test utilisateur ; cas d'usage de démo à choisir |
 | 3 | Backend CPU par défaut ; Kotlin 2.4.0 (imposé par LiteRT-LM 0.18.0) | Chargement 0,8 s vs 51,6 s, débit équivalent, moins de mémoire (voir `docs/MESURES.md`) |

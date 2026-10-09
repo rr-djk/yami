@@ -33,6 +33,6 @@ class MainActivity : ComponentActivity() {
     private fun chatFactory(app: YamyApp) = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator) as T
+            ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource) as T
     }
 }

@@ -7,10 +7,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MessageDao {
-    @Query("SELECT * FROM messages ORDER BY createdAt ASC, id ASC")
+    @Query("SELECT * FROM messages ORDER BY id ASC")
     fun observeAll(): Flow<List<MessageEntity>>
 
-    @Query("SELECT * FROM (SELECT * FROM messages ORDER BY createdAt DESC, id DESC LIMIT :limit) ORDER BY createdAt ASC, id ASC")
+    @Query("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT :limit) ORDER BY id ASC")
     suspend fun recent(limit: Int): List<MessageEntity>
 
     @Insert
