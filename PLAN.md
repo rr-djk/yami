@@ -68,7 +68,7 @@ Yamy est un compagnon conversationnel qui tourne **entièrement sur le télépho
 | 7 | `step/07-design-retro` | (ajout) | Thème rétro (skill `retro-style`) : Macondo + JetBrains Mono embarquées, palette bleu/violet, cartes à ombre dure | Rendu à valider sur le Pixel |
 | 8 | `step/08-privacy` | 6:30–7:00 | `allowBackup=false`, `FLAG_SECURE`, Keystore, biométrie, « Tout effacer » | Checklist §6 cochée |
 | 9 | `step/09-safety-eval` | 7:00–7:40 | `DistressDetector`, banc 18+ messages, tests JVM | Score X/18 consigné |
-| 10 | `step/10-demo` | 7:40–8:00 | README, vidéo plan B, soumission | Livrables §8 |
+| 10 | `step/10-demo` | 7:40–8:00 | README, vidéo plan B, soumission | Livrables §8 (README, mesures, banc, soumission faits ; vidéo à enregistrer par l'équipe) |
 
 ### Points de décision
 | Moment | Question | Si non |
@@ -100,15 +100,15 @@ Yamy est un compagnon conversationnel qui tourne **entièrement sur le télépho
 
 ## 6. Checklist confidentialité
 
-- [ ] Aucune permission INTERNET.
-- [ ] Fonctionne en mode avion.
-- [ ] `allowBackup=false`.
-- [ ] `FLAG_SECURE`.
-- [ ] Données (messages, skills, mémoire) chiffrées, clé dans le Keystore.
-- [ ] Verrouillage biométrique.
+- [x] Aucune permission INTERNET.
+- [ ] Fonctionne en mode avion (aucun accès réseau dans le code ; test manuel à faire).
+- [x] `allowBackup=false`.
+- [x] `FLAG_SECURE`.
+- [x] Données (messages, skills) chiffrées, clé dans le Keystore.
+- [x] Verrouillage biométrique.
 - [ ] Notifications sans contenu.
-- [ ] « Tout effacer » vérifié (messages, mémoire, skills).
-- [ ] Aucune bibliothèque d'analytique ni de journalisation distante.
+- [ ] « Tout effacer » vérifié sur le Pixel (implémenté et audité ; test manuel à faire).
+- [x] Aucune bibliothèque d'analytique ni de journalisation distante.
 - [ ] Limite assumée : clavier tiers et téléphone déverrouillé hors du contrôle de l'app.
 
 ### Risques restants connus (audit de l'étape 8)
@@ -134,11 +134,11 @@ Tester aussi les tentatives de contournement des consignes. Afficher « X / N ac
 
 ## 8. Livrables
 
-- [ ] Dépôt + instructions de build (CLI) et de placement du modèle.
-- [ ] Tableau de mesures Pixel 10a.
-- [ ] Banc de test et résultats.
+- [x] Dépôt + instructions de build (CLI) et de placement du modèle.
+- [x] Tableau de mesures Pixel 10a.
+- [x] Banc de test et résultats.
 - [ ] Vidéo de démo (plan B).
-- [ ] Texte de soumission : usage de Gemma 4, pourquoi le local, limites.
+- [x] Texte de soumission : usage de Gemma 4, pourquoi le local, limites.
 
 **Scénario de démo (3-5 min) :** permissions vides → mode avion → conversation + photo → création d'un skill par dictée → « Tout effacer » → message de détresse → tableau de mesures → « Ne nous croyez pas, vérifiez ».
 
