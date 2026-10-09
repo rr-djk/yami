@@ -2,7 +2,7 @@ package app.yamy.engine
 
 import kotlinx.coroutines.flow.Flow
 
-/** Backend de calcul demandé au runtime. */
+/** Backend de calcul demandé au runtime. CPU par défaut (voir docs/MESURES.md). */
 enum class ComputeBackend { CPU, GPU }
 
 /**
