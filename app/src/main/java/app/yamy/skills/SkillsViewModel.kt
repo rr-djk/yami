@@ -42,7 +42,7 @@ class SkillsViewModel(
         refresh()
     }
 
-    private fun refresh() {
+    fun refresh() {
         viewModelScope.launch {
             val all = withContext(Dispatchers.IO) { repository.list() }
             _state.update { it.copy(skills = all) }

@@ -111,6 +111,15 @@ Yamy est un compagnon conversationnel qui tourne **entièrement sur le télépho
 - [ ] Aucune bibliothèque d'analytique ni de journalisation distante.
 - [ ] Limite assumée : clavier tiers et téléphone déverrouillé hors du contrôle de l'app.
 
+### Risques restants connus (audit de l'étape 8)
+- **Effacement non cryptographique** : « Tout effacer » supprime les lignes, mais la clé du Keystore et le fichier de base restent ; des pages libérées pourraient être récupérables par quelqu'un qui exécute du code en tant qu'app (build debug, root).
+- **Verrou** : sans écran de verrouillage sur le téléphone, l'app s'ouvre sans verrou (signalé dans « Vie privée »).
+- **Modèle** : non vérifié par empreinte (SHA-256) ; quelqu'un avec adb peut le remplacer.
+- **Cache LiteRT** (~1 Go) non vidé par « Tout effacer » (contenu dérivé du modèle, à confirmer).
+- **Clavier / texte non envoyé** : `rememberSaveable` garde le texte en cours de saisie dans l'état système.
+- **Build debug** : débogable, donc lisible par adb ; la démo doit utiliser un build de production (le contrôle « Build de production » l'indique).
+- **Appareil photo** : la photo transite par l'application d'appareil photo du téléphone (copie temporaire supprimée par Yamy ensuite).
+
 ## 7. Banc de test
 
 Trois familles (≈ 6 messages chacune) + quelques cas image :

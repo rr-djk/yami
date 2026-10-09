@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yamy.R
+import app.yamy.vision.ContentResolverImageSource
 import app.yamy.ui.components.RetroButton
 import app.yamy.ui.components.RetroCard
 import app.yamy.ui.components.RetroOutlinedButton
@@ -54,19 +55,22 @@ import app.yamy.ui.theme.RetroColors
 import app.yamy.ui.theme.TechnicalTextStyle
 
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit) {
+fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit, onOpenPrivacy: () -> Unit) {
     val ui by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
-    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let(viewModel::attachImage)
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-        val uri = cameraUri
-        if (saved && uri != null) viewModel.attachImage(uri)
+        val uri = cameraUri?.let(Uri::parse)
+        cameraUri = null
+        if (uri != null) {
+            if (saved) viewModel.attachImage(uri) else viewModel.discardCapture(uri)
+        }
     }
     val canAttach = ui.status == EngineStatus.READY
 
@@ -86,6 +90,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = RetroColors.Secondary)
             Row {
                 RetroTextButton(onClick = onOpenSkills, label = stringResource(R.string.skills), enabled = ui.status == EngineStatus.READY)
+                RetroTextButton(onClick = onOpenPrivacy, label = stringResource(R.string.privacy))
                 RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
             }
         }
@@ -127,9 +132,9 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             ) { Text(stringResource(R.string.attach_gallery)) }
             RetroOutlinedButton(
                 onClick = {
-                    val file = File(File(context.cacheDir, "camera").apply { mkdirs() }, "capture.jpg")
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.camera", file)
-                    cameraUri = uri
+                    val file = File(ContentResolverImageSource.cameraDir(context).apply { mkdirs() }, "capture-${System.nanoTime()}.jpg")
+                    val uri = FileProvider.getUriForFile(context, ContentResolverImageSource.cameraAuthority(context), file)
+                    cameraUri = uri.toString()
                     cameraLauncher.launch(uri)
                 },
                 enabled = canAttach,
