@@ -6,7 +6,7 @@
     <string name="welcome_body">Comment puis-je t\'aider ? De quoi veux-tu parler ?</string>
     <string name="input_hint">Écris à Yamy…</string>
     <string name="send">Envoyer</string>
-    <string name="clear_conversation">Effacer</string>
+    <string name="clear_conversation">🧹 Effacer les messages</string>
     <string name="model_missing">Modèle introuvable. Copie-le avec adb push vers :\n%1$s</string>
     <string name="attach_gallery">Galerie</string>
     <string name="attach_camera">Photo</string>
@@ -42,9 +42,9 @@
     <string name="thinking">Yamy réfléchit…</string>
     <string name="hide_keyboard">Fermer le clavier</string>
     <string name="sessions_title">Discussions</string>
-    <string name="new_session">+ Nouvelle discussion</string>
+    <string name="new_session">＋ Nouvelle discussion</string>
     <string name="choose_starter">De quoi veux-tu parler ?</string>
-    <string name="delete_session">Supprimer la discussion</string>
+    <string name="delete_session">🗑️ Supprimer la discussion</string>
     <string name="delete_session_confirm">Cette discussion et tous ses messages seront supprimés.</string>
     <string name="back_to_sessions">← Discussions</string>
     <string name="tab_sessions">Discussions</string>
@@ -62,7 +62,7 @@
     <string name="voice_label">🎙️ Message vocal</string>
     <string name="mic_denied">Le micro est nécessaire pour parler à Yamy. Tu peux l\'autoriser dans les réglages.</string>
     <string name="agents">🤝 Agents</string>
-    <string name="remember">📝 Retenir</string>
+    <string name="remember">📝 Retenir cette discussion</string>
     <string name="scribe_working">📝 Le Scribe relit la discussion…</string>
     <string name="scribe_nothing">📝 Rien de nouveau à retenir.</string>
     <string name="scribe_done">📝 Yamy a noté : %1$s</string>
@@ -79,10 +79,10 @@
     <string name="connected_mode">Mode connecté</string>
     <string name="connected_mode_detail">Hors ligne par défaut. Connecté, Yamy peut préparer des messages Discord via son connecteur MCP : tu relis et confirmes chaque envoi. Le modèle, lui, reste toujours sur le téléphone.</string>
     <string name="connect_confirm_title">Passer en mode Connecté ?</string>
-    <string name="connect_confirm_text">Seuls les messages que tu confirmes quitteront le téléphone, vers Discord. Ils peuvent contenir des extraits de tes discussions ou de tes notes : relis-les avant de publier. Le modèle reste toujours ici.</string>
+    <string name="connect_confirm_text">En mode Connecté, Yamy contacte Discord avec le jeton du bot pour lister les salons ; seuls les messages que tu confirmes y sont publiés, dans les salons que tu as cochés. Ils peuvent contenir des extraits de tes discussions ou de tes notes : relis-les. Le modèle reste toujours ici.</string>
     <string name="connect_yes">Me connecter</string>
     <string name="discord_title">Discord</string>
-    <string name="discord_guide">1. discord.com/developers › New Application › onglet Bot › Reset Token, puis copie le jeton.\n2. OAuth2 › URL Generator : coche « bot », puis les permissions « View Channels » et « Send Messages ».\n3. Ouvre l\'URL générée et invite le bot sur ton serveur.\n4. Colle le jeton ici. Ce n\'est pas ton mot de passe, et tu peux le révoquer à tout moment.</string>
+    <string name="discord_guide">1. discord.com/developers › New Application › onglet Bot › Reset Token, puis copie le jeton.\nDans l\'onglet Bot, décoche « Public Bot » pour que personne d\'autre ne puisse l\'inviter.\n2. OAuth2 › URL Generator : coche « bot », puis les permissions « View Channels » et « Send Messages ».\n3. Ouvre l\'URL générée et invite le bot sur ton serveur.\n4. Colle le jeton ici. Ce n\'est pas ton mot de passe, et tu peux le révoquer à tout moment.</string>
     <string name="discord_token">Jeton du bot</string>
     <string name="discord_configured">Bot Discord configuré</string>
     <string name="discord_test">Tester et lister les salons</string>
@@ -94,4 +94,14 @@
     <string name="message_send">Publier</string>
     <string name="message_sending">Envoi…</string>
     <string name="message_offline">Repasse en mode Connecté pour publier.</string>
+    <string name="open_menu">Ouvrir le menu</string>
+    <string name="more_actions">Plus d\'actions</string>
+    <string name="add_menu">Ajouter une photo ou un agent</string>
+    <string name="take_photo">📷 Prendre une photo</string>
+    <string name="pick_gallery">🖼️ Choisir dans la galerie</string>
+    <string name="drawer_tools">🛠️ Outils et agents</string>
+    <string name="drawer_memory">🧠 Mémoire</string>
+    <string name="drawer_privacy">🔒 Vie privée et connecteurs</string>
+    <string name="discord_suspicious">⚠ Nom en écriture mêlée ou non latine : vérifie que c\'est bien ton salon.</string>
+    <string name="discord_channels_title">Salons que Yamy peut utiliser</string>
 </resources>

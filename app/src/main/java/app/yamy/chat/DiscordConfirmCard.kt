@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.yamy.R
 import app.yamy.connect.NetworkMode
 import app.yamy.mcp.discord.DiscordDraft
+import app.yamy.mcp.discord.DiscordNames
 import app.yamy.ui.components.RetroButton
 import app.yamy.ui.components.RetroCard
 import app.yamy.ui.components.RetroTextButton
@@ -47,6 +48,9 @@ fun DiscordConfirmCard(draft: DiscordDraft, connected: Boolean, sending: Boolean
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.discord_card_title), style = MaterialTheme.typography.titleMedium, color = RetroColors.Secondary)
             Text(stringResource(R.string.discord_channel, draft.channel.label), style = MaterialTheme.typography.bodyLarge)
+            if (DiscordNames.looksSuspicious(draft.channel.label)) {
+                Text(stringResource(R.string.discord_suspicious), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            }
             Text(draft.content, style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.message_size, draft.content.lines().size, draft.content.length), style = MaterialTheme.typography.bodySmall)
             if (!connected) Text(stringResource(R.string.message_offline), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)

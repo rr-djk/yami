@@ -8,7 +8,11 @@ import app.yamy.skills.SkillRepository
 object ChainCatalog {
     private const val DIR = "chains"
 
+    /** Chaînes autrefois livrées puis retirées : supprimées des téléphones à la mise à jour. */
+    private val RETIRED = setOf("revision")
+
     fun installDefaults(assets: AssetManager, skills: SkillRepository) {
+        RETIRED.forEach { name -> if (skills.get(name)?.isChain == true) skills.delete(name) }
         assets.list(DIR).orEmpty().forEach { file ->
             val text = assets.open("$DIR/$file").bufferedReader().use { it.readText() }
             val skill = (SkillFormat.parse(text) as? SkillFormat.Result.Valid)?.skill ?: return@forEach

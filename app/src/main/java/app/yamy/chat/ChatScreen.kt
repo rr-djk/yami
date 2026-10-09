@@ -1,6 +1,8 @@
 package app.yamy.chat
 
 import android.Manifest
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.heightIn
@@ -81,7 +83,12 @@ import app.yamy.ui.theme.TechnicalTextStyle
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, onOpenConnectors: () -> Unit) {
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    modelPath: String,
+    onOpenDrawer: () -> Unit,
+    onOpenConnectors: () -> Unit,
+) {
     val ui by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
@@ -138,7 +145,8 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, 
     val run = ui.chainRun?.takeIf { it.summary == null || ui.messages.lastOrNull()?.text != it.summary }
     val thinking = ui.status == EngineStatus.GENERATING && ui.draft.isBlank() && run == null
     val chains by viewModel.chains.collectAsState()
-    var agentsMenu by remember { mutableStateOf(false) }
+    var showStarters by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val inputFocus = remember { FocusRequester() }
     // Liste inversée (index 0 = bas) : la réponse qui s'allonge reste collée en bas de l'écran.
     // On ne suit le flux que si l'utilisateur est déjà en bas, pour ne pas l'empêcher de remonter lire.
@@ -147,23 +155,19 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, 
     }
 
     Column(modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RetroTextButton(onClick = onBack, label = stringResource(R.string.back_to_sessions))
-            Text(
-                ui.session?.title ?: stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleLarge,
-                color = RetroColors.Secondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-            RetroTextButton(onClick = viewModel::rememberSession, label = stringResource(R.string.remember), enabled = ui.status == EngineStatus.READY && ui.messages.isNotEmpty())
-            RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
-        }
-        NetworkIndicator(network, onOpenConnectors)
+        val canAct = ui.status == EngineStatus.READY
+        ChatTopBar(
+            title = ui.session?.title ?: stringResource(R.string.app_name),
+            network = network,
+            onOpenDrawer = onOpenDrawer,
+            onOpenConnectors = onOpenConnectors,
+            onNewChat = { showStarters = true },
+            actions = listOf(
+                TopBarAction(stringResource(R.string.remember), enabled = canAct && ui.messages.isNotEmpty(), onClick = viewModel::rememberSession),
+                TopBarAction(stringResource(R.string.clear_conversation), onClick = viewModel::clearConversation),
+                TopBarAction(stringResource(R.string.delete_session), onClick = { confirmDelete = true }),
+            ),
+        )
         RetroRule()
         if (ui.status == EngineStatus.LOADING || ui.status == EngineStatus.GENERATING) {
             LinearProgressIndicator(
@@ -226,86 +230,63 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, 
             ListeningPanel(voice, onFinish = viewModel::stopListening, onCancel = viewModel::cancelListening)
             return@Column
         }
-        ui.pendingImage?.let { PendingImageChip(it, viewModel::discardImage) }
-        // Clavier ouvert : on masque les boutons photo et la mention pour garder la conversation visible.
-        if (!imeVisible) Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            RetroOutlinedButton(
-                onClick = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                enabled = canAttach,
-            ) { Text(stringResource(R.string.attach_gallery)) }
-            RetroOutlinedButton(
-                onClick = {
-                    val file = File(ContentResolverImageSource.cameraDir(context).apply { mkdirs() }, "capture-${System.nanoTime()}.jpg")
-                    val uri = FileProvider.getUriForFile(context, ContentResolverImageSource.cameraAuthority(context), file)
-                    cameraUri = uri.toString()
-                    cameraLauncher.launch(uri)
-                },
-                enabled = canAttach,
-            ) { Text(stringResource(R.string.attach_camera)) }
-            if (chains.isNotEmpty()) {
-                Box {
-                    RetroOutlinedButton(onClick = { agentsMenu = true }, enabled = canAttach) { Text(stringResource(R.string.agents)) }
-                    DropdownMenu(expanded = agentsMenu, onDismissRequest = { agentsMenu = false }, containerColor = RetroColors.Surface) {
-                        chains.forEach { chain ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(chain.agents.joinToString(" ") { it.emoji } + "  /" + chain.name, style = MaterialTheme.typography.titleSmall)
-                                        Text(chain.description, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                },
-                                onClick = {
-                                    agentsMenu = false
-                                    input = "/${chain.name} "
-                                    inputFocus.requestFocus()
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            RetroTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.weight(1f).focusRequester(inputFocus).semantics { contentDescription = "Message pour Yamy" },
-                placeholder = { Text(stringResource(R.string.input_hint)) },
-                maxLines = if (imeVisible) 3 else 4,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { submit() }),
-            )
-            val micLabel = stringResource(R.string.mic_description)
-            RetroOutlinedButton(
-                onClick = ::startVoice,
-                enabled = ui.status == EngineStatus.READY,
-                modifier = Modifier.semantics { contentDescription = micLabel },
-            ) { Text(stringResource(R.string.mic)) }
-            RetroButton(onClick = ::submit, enabled = canSend) { Text(stringResource(R.string.send)) }
-        }
-        if (imeVisible) {
-            RetroTextButton(
-                onClick = {
-                    keyboard?.hide()
-                    focusManager.clearFocus()
-                },
-                label = stringResource(R.string.hide_keyboard),
-                modifier = Modifier.padding(start = 4.dp),
-            )
-        } else {
+        Composer(
+            input = input,
+            onInputChange = { input = it },
+            hasImage = ui.pendingImage != null,
+            enabled = canAttach,
+            chains = chains,
+            focusRequester = inputFocus,
+            maxLines = if (imeVisible) 3 else 5,
+            onCamera = {
+                val file = File(ContentResolverImageSource.cameraDir(context).apply { mkdirs() }, "capture-${System.nanoTime()}.jpg")
+                val uri = FileProvider.getUriForFile(context, ContentResolverImageSource.cameraAuthority(context), file)
+                cameraUri = uri.toString()
+                cameraLauncher.launch(uri)
+            },
+            onGallery = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onChain = { chain ->
+                input = "/${chain.name} "
+                inputFocus.requestFocus()
+            },
+            onMic = ::startVoice,
+            onSend = ::submit,
+            attachment = { ui.pendingImage?.let { PendingImageChip(it, viewModel::discardImage) } },
+        )
+        if (!imeVisible) {
             Text(
                 stringResource(R.string.ai_disclaimer),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
             )
         }
+    }
+
+    if (showStarters) {
+        StarterSheet(
+            onPick = { starter ->
+                showStarters = false
+                val title = if (starter.topic.isEmpty()) Session.DEFAULT_TITLE else starter.title
+                viewModel.newSession(title, starter.topic)
+            },
+            onDismiss = { showStarters = false },
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.delete_session)) },
+            text = { Text(stringResource(R.string.delete_session_confirm)) },
+            confirmButton = {
+                RetroButton(onClick = {
+                    confirmDelete = false
+                    ui.session?.let { viewModel.deleteSession(it.id) }
+                }) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = { RetroTextButton(onClick = { confirmDelete = false }, label = stringResource(R.string.cancel)) },
+            containerColor = RetroColors.Surface,
+        )
     }
 }
 

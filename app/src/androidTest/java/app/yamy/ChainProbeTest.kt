@@ -23,7 +23,7 @@ class ChainProbeTest {
         out.writeText("")
         val requests = mapOf(
             "le-conseil" to "Dois-je quitter mon travail pour reprendre mes études ?",
-            "revision" to "La photosynthèse transforme la lumière en énergie chimique dans les chloroplastes. Elle consomme du CO2 et de l'eau et produit du glucose et de l'oxygène.",
+            "entretien" to "Offre : développeur Android junior, Kotlin et Jetpack Compose, travail en équipe agile.",
         )
         for ((name, request) in requests) {
             val chain = ChainFormat.parse(app.skills.get(name)!!)!!

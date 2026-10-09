@@ -35,14 +35,18 @@ import app.yamy.ui.theme.RetroColors
 
 /** Onglet Mémoire : les notes reliées de Yamy, lisibles, modifiables et supprimables. */
 @Composable
-fun MemoryScreen(viewModel: MemoryViewModel, modifier: Modifier = Modifier) {
+fun MemoryScreen(viewModel: MemoryViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val ui by viewModel.state.collectAsState()
     var confirmForget by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize().imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.memory_title), style = MaterialTheme.typography.displaySmall, color = RetroColors.Secondary, modifier = Modifier.weight(1f))
-            if (ui.editing != null) RetroTextButton(onClick = { viewModel.edit(null) }, label = stringResource(R.string.back))
+            if (ui.editing != null) {
+                RetroTextButton(onClick = { viewModel.edit(null) }, label = stringResource(R.string.back))
+            } else {
+                RetroTextButton(onClick = onClose, label = stringResource(R.string.close))
+            }
         }
         RetroRule()
         val editing = ui.editing

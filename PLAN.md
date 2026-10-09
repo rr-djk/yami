@@ -161,7 +161,7 @@ Tester aussi les tentatives de contournement des consignes. Afficher « X / N ac
 | 7 | Style rétro, thème clair uniquement, sans couleurs dynamiques. Bleu/vert/orange en fond seulement (contraste < 4,5:1 en texte sur blanc), violet en grands titres/contours | Skill retro-style + accessibilité prioritaire ; android-design (couleurs dynamiques) écarté à la demande de l'utilisateur |
 | 11 | Discussions thématiques + barre de navigation ; migration Room 2→3 vérifiée sur la vraie base (14 messages conservés) | Demande utilisateur (sessions par sujet) |
 | 12 | Micro : transcription Gemma pendant la parole, puis réponse ; voix TTS hors ligne seulement | Mesures `docs/MESURES.md` ; détresse vérifiée sur le texte ; aucune donnée envoyée en ligne |
-| 13 | Chaînes d'agents orchestrées en code (Le Conseil, Révision, Entretien) | Petit modèle : enchaînement déterministe plus fiable ; ~30 s par chaîne |
+| 13 | Chaînes d'agents orchestrées en code (Le Conseil, Entretien) | Petit modèle : enchaînement déterministe plus fiable ; ~30 s par chaîne |
 | 14 | Mémoire façon Obsidian (index + notes reliées chiffrées, Scribe annulable, outil lireNote) | Schéma « LLM Wiki » de Karpathy, déclenché à la demande (« 📝 Retenir ») |
 | 15 | Connecteurs MCP : serveur Gmail porté dans l'app + switch logiciel Hors ligne/Connecté (choix utilisateur : une seule app) | Android ne lance pas de serveur stdio Java ; promesse reformulée honnêtement (« hors ligne par défaut ») |
 | 3 | Backend CPU par défaut ; Kotlin 2.4.0 (imposé par LiteRT-LM 0.18.0) | Chargement 0,8 s vs 51,6 s, débit équivalent, moins de mémoire (voir `docs/MESURES.md`) |
