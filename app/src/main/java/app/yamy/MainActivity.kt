@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.yamy.chat.ChatScreen
 import app.yamy.chat.ChatViewModel
@@ -29,7 +28,6 @@ import app.yamy.privacy.PrivacyScreen
 import app.yamy.skills.SkillsScreen
 import app.yamy.skills.SkillsViewModel
 import app.yamy.ui.theme.YamyTheme
-import kotlinx.coroutines.launch
 
 private enum class Screen { CHAT, SKILLS, PRIVACY }
 
@@ -71,7 +69,7 @@ class MainActivity : FragmentActivity() {
     private fun Content() {
         var screen by rememberSaveable { mutableStateOf(Screen.CHAT) }
         val chat = viewModel<ChatViewModel>(
-            factory = factory { ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills) },
+            factory = factory { ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper) },
         )
         when (screen) {
             Screen.CHAT -> ChatScreen(
@@ -90,12 +88,7 @@ class MainActivity : FragmentActivity() {
                 BackHandler { screen = Screen.CHAT }
                 PrivacyScreen(
                     audit = app.privacyAudit,
-                    onWipe = {
-                        lifecycleScope.launch {
-                            app.dataWiper.wipeAll()
-                            screen = Screen.CHAT
-                        }
-                    },
+                    onWipe = { chat.wipeAll { screen = Screen.CHAT } },
                     onClose = { screen = Screen.CHAT },
                 )
             }

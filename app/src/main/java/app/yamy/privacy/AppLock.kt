@@ -1,6 +1,7 @@
 package app.yamy.privacy
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -27,11 +28,15 @@ class AppLock(private val context: Context) {
         get() = BiometricManager.from(context).canAuthenticate(AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
 
     fun onAppLeft() {
-        leftAt = System.currentTimeMillis()
+        leftAt = SystemClock.elapsedRealtime()
+        prompting = false
     }
 
+    /** Horloge monotone : changer la date du téléphone ne prolonge pas le délai de grâce. */
     fun onAppReturned() {
-        if (leftAt != 0L && System.currentTimeMillis() - leftAt > GRACE_MS) _locked.value = true
+        if (leftAt == 0L) return
+        val away = SystemClock.elapsedRealtime() - leftAt
+        if (away < 0 || away > GRACE_MS) _locked.value = true
     }
 
     fun authenticate(activity: FragmentActivity) {

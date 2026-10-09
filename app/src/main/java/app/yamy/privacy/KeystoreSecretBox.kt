@@ -38,7 +38,10 @@ class KeystoreSecretBox(private val alias: String = DEFAULT_ALIAS) : SecretBox {
 
     @Synchronized
     private fun key(): SecretKey {
-        (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
+        if (keyStore.containsAlias(alias)) {
+            // Ne jamais régénérer sous le même alias : cela rendrait illisible tout ce que l'ancienne clé protège.
+            return checkNotNull(keyStore.getKey(alias, null) as? SecretKey) { "Clé du Keystore inutilisable" }
+        }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
             KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)

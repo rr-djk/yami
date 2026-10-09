@@ -32,8 +32,30 @@ class YamyApp : Application() {
     val appLock: AppLock by lazy { AppLock(this) }
     val privacyAudit: PrivacyAudit by lazy { PrivacyAudit(this, secretBox, appLock) }
     val conversations: ConversationRepository by lazy {
-        val passphrase = DatabasePassphrase(java.io.File(filesDir, "db.key"), secretBox).get()
-        RoomConversationRepository(AppDatabase.create(this, passphrase).messageDao())
+        RoomConversationRepository(AppDatabase.create(this, databasePassphrase()).messageDao())
     }
-    val dataWiper: DataWiper by lazy { DataWiper(conversations, skills, engine, filesDir) }
+    val dataWiper: DataWiper by lazy { DataWiper(conversations, skills, engine, filesDir, cacheDir) }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Une photo d'appareil restée en cache après un arrêt brutal ne doit pas survivre.
+        java.io.File(cacheDir, "camera").deleteRecursively()
+    }
+
+    /**
+     * Si la clé du Keystore est perdue, les données chiffrées sont définitivement illisibles :
+     * on repart d'une base vide plutôt que de planter à chaque lancement.
+     */
+    private fun databasePassphrase(): ByteArray {
+        val store = DatabasePassphrase(java.io.File(filesDir, "db.key"), secretBox)
+        return try {
+            store.get()
+        } catch (e: DatabasePassphrase.UnreadableException) {
+            store.delete()
+            deleteDatabase("yamy-secure.db")
+            secretBox.destroyKey()
+            java.io.File(filesDir, "skills").deleteRecursively()
+            store.get()
+        }
+    }
 }

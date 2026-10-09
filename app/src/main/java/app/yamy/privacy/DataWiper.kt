@@ -12,11 +12,13 @@ class DataWiper(
     private val skills: SkillRepository,
     private val engine: ChatEngine,
     private val filesDir: File,
+    private val cacheDir: File,
 ) {
     suspend fun wipeAll() {
         conversations.clear()
         skills.deleteAll()
         File(filesDir, AssetPersonaProvider.FILE_NAME).delete()
+        File(cacheDir, "camera").deleteRecursively()
         engine.invalidateConversation()
     }
 }

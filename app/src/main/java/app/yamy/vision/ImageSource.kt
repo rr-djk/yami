@@ -6,4 +6,7 @@ import android.net.Uri
 interface ImageSource {
     /** Décode, redimensionne et ré-encode l'image, uniquement en mémoire. */
     suspend fun load(uri: Uri): ByteArray
+
+    /** Supprime la copie temporaire laissée par l'appareil photo, le cas échéant. */
+    fun discard(uri: Uri)
 }

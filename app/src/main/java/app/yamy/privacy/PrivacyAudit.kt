@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.view.WindowManager
+import java.io.File
 
 /** Une vérification de confidentialité, calculée en direct sur l'appareil. */
 data class PrivacyCheck(val label: String, val passed: Boolean, val detail: String)
@@ -19,6 +20,10 @@ class PrivacyAudit(
         val permissions = info.requestedPermissions.orEmpty().map { it.substringAfterLast('.') }
         val hasInternet = permissions.contains("INTERNET")
         val backupAllowed = (context.applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP) != 0
+        val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        val leftovers = File(context.cacheDir, "camera").list().orEmpty().isNotEmpty() ||
+            context.getDatabasePath("yamy.db").exists()
+        val encrypted = box.hasKey() && !leftovers
         return listOf(
             PrivacyCheck(
                 "Aucun accès à Internet",
@@ -36,9 +41,14 @@ class PrivacyAudit(
                 "Aperçu masqué dans les applications récentes",
             ),
             PrivacyCheck(
-                "Données chiffrées",
-                box.hasKey(),
-                "Conversations et skills chiffrés, clé dans le Keystore",
+                "Données chiffrées, sans résidu",
+                encrypted,
+                if (encrypted) "Conversations et skills chiffrés, clé dans le Keystore, aucune photo en clair" else "Clé absente, photo temporaire ou ancienne base en clair détectée",
+            ),
+            PrivacyCheck(
+                "Build de production",
+                !debuggable,
+                if (debuggable) "Build de développement : accessible par adb, à ne pas distribuer" else "Application non déboguable",
             ),
             PrivacyCheck(
                 "Verrouillage de l'app",

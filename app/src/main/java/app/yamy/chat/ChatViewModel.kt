@@ -8,12 +8,14 @@ import app.yamy.engine.ChatInput
 import app.yamy.engine.ModelLocator
 import app.yamy.engine.Turn
 import app.yamy.persona.PersonaProvider
+import app.yamy.privacy.DataWiper
 import app.yamy.skills.SkillPrompt
 import app.yamy.skills.SkillRepository
 import app.yamy.vision.ImageSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,6 +48,7 @@ class ChatViewModel(
     private val locator: ModelLocator,
     private val imageSource: ImageSource,
     private val skills: SkillRepository,
+    private val wiper: DataWiper,
 ) : ViewModel() {
 
     private val draft = MutableStateFlow("")
@@ -96,11 +99,18 @@ class ChatViewModel(
         viewModelScope.launch {
             try {
                 pendingImage.value = PendingImage(imageSource.load(uri))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 error.value = "Image illisible : ${e.message}"
+            } finally {
+                imageSource.discard(uri)
             }
         }
     }
+
+    /** Photo annulée ou perdue : on supprime la copie laissée par l'appareil photo. */
+    fun discardCapture(uri: Uri) = imageSource.discard(uri)
 
     fun discardImage() {
         pendingImage.value = null
@@ -137,6 +147,25 @@ class ChatViewModel(
             } finally {
                 draft.value = ""
             }
+        }
+    }
+
+    /**
+     * « Tout effacer » : interrompt la génération en cours, vide la mémoire de l'écran puis les données.
+     * Ne peut pas être annulé en cours de route.
+     */
+    fun wipeAll(onDone: () -> Unit) {
+        val running = generation
+        viewModelScope.launch(NonCancellable) {
+            running?.cancelAndJoin()
+            conversationLock.withLock {
+                pendingImage.value = null
+                draft.value = ""
+                error.value = null
+                wiper.wipeAll()
+            }
+            if (status.value != EngineStatus.MODEL_MISSING) status.value = EngineStatus.READY
+            onDone()
         }
     }
 

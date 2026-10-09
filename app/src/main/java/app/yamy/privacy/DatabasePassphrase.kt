@@ -9,13 +9,23 @@ import java.security.SecureRandom
  */
 class DatabasePassphrase(private val file: File, private val box: SecretBox) {
 
+    /** Levée quand la phrase existe mais ne peut plus être lue (clé perdue, fichier tronqué). */
+    class UnreadableException(cause: Throwable) : Exception("Phrase de la base illisible", cause)
+
+    /** Ne crée une nouvelle phrase que si aucune n'existe : une phrase illisible n'est jamais écrasée en silence. */
     @Synchronized
     fun get(): ByteArray {
         if (file.isFile) {
-            runCatching { return box.decrypt(file.readBytes()) }
+            return try {
+                box.decrypt(file.readBytes())
+            } catch (e: Exception) {
+                throw UnreadableException(e)
+            }
         }
         val fresh = ByteArray(SIZE).also { SecureRandom().nextBytes(it) }
-        file.writeBytes(box.encrypt(fresh))
+        val temp = File(file.parentFile, file.name + ".tmp")
+        temp.writeBytes(box.encrypt(fresh))
+        check(temp.renameTo(file)) { "Écriture atomique impossible" }
         return fresh
     }
 
