@@ -106,7 +106,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             when {
                 ui.status == EngineStatus.MODEL_MISSING -> Notice(stringResource(R.string.model_missing, modelPath), technical = true)
                 ui.status == EngineStatus.ERROR -> Notice(ui.error.orEmpty(), technical = true, isError = true)
-                rows.isEmpty() -> Notice(stringResource(R.string.empty_chat))
+                rows.isEmpty() -> Welcome()
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -165,6 +165,17 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
         )
+    }
+}
+
+@Composable
+private fun Welcome() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    ) {
+        Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.displaySmall, color = RetroColors.Secondary)
+        Text(stringResource(R.string.welcome_body), style = MaterialTheme.typography.headlineSmall)
     }
 }
 
