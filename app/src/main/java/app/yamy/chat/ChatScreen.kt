@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.yamy.R
 import app.yamy.vision.ContentResolverImageSource
@@ -69,7 +70,7 @@ import app.yamy.ui.theme.TechnicalTextStyle
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit, onOpenPrivacy: () -> Unit) {
+fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) {
     val ui by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
@@ -113,16 +114,19 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
 
     Column(modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = RetroColors.Secondary)
-            Row {
-                RetroTextButton(onClick = onOpenSkills, label = stringResource(R.string.skills), enabled = ui.status == EngineStatus.READY)
-                RetroTextButton(onClick = onOpenPrivacy, label = stringResource(R.string.privacy))
-                RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
-            }
+            RetroTextButton(onClick = onBack, label = stringResource(R.string.back_to_sessions))
+            Text(
+                ui.session?.title ?: stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleLarge,
+                color = RetroColors.Secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            )
+            RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
         }
         RetroRule()
         if (ui.status == EngineStatus.LOADING || ui.status == EngineStatus.GENERATING) {

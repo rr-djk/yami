@@ -41,4 +41,16 @@
     <string name="ai_disclaimer">Yamy est une IA, elle peut se tromper.</string>
     <string name="thinking">Yamy réfléchit…</string>
     <string name="hide_keyboard">Fermer le clavier</string>
+    <string name="sessions_title">Discussions</string>
+    <string name="new_session">+ Nouvelle discussion</string>
+    <string name="choose_starter">De quoi veux-tu parler ?</string>
+    <string name="delete_session">Supprimer la discussion</string>
+    <string name="delete_session_confirm">Cette discussion et tous ses messages seront supprimés.</string>
+    <string name="back_to_sessions">← Discussions</string>
+    <string name="tab_sessions">Discussions</string>
+    <string name="tab_tools">Outils</string>
+    <string name="tab_memory">Mémoire</string>
+    <string name="tab_privacy">Vie privée</string>
+    <string name="memory_title">Mémoire</string>
+    <string name="memory_soon">Bientôt : ce que Yamy retient de vos discussions, en notes reliées que tu pourras lire, corriger et supprimer.</string>
 </resources>

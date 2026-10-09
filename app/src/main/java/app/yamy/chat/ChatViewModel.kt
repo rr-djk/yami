@@ -16,6 +16,7 @@ import app.yamy.skills.SkillRepository
 import app.yamy.vision.ImageSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -41,6 +44,7 @@ data class ChatUiState(
     val status: EngineStatus = EngineStatus.LOADING,
     val error: String? = null,
     val pendingImage: PendingImage? = null,
+    val session: Session? = null,
 )
 
 class ChatViewModel(
@@ -51,6 +55,7 @@ class ChatViewModel(
     private val imageSource: ImageSource,
     private val skills: SkillRepository,
     private val wiper: DataWiper,
+    private val sessions: SessionRepository,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -58,14 +63,24 @@ class ChatViewModel(
     private val status = MutableStateFlow(EngineStatus.LOADING)
     private val error = MutableStateFlow<String?>(null)
     private val pendingImage = MutableStateFlow<PendingImage?>(null)
+    private val currentSession = MutableStateFlow<Session?>(null)
+
+    /** Toutes les discussions, la plus récente en premier. */
+    val sessionList: StateFlow<List<Session>> =
+        sessions.observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Sérialise les opérations qui touchent à la conversation du moteur (envoi, effacement, reprise). */
     private val conversationLock = Mutex()
     private var generation: Job? = null
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val messages = currentSession.flatMapLatest { session ->
+        if (session == null) flowOf(emptyList()) else repository.observe(session.id)
+    }
+
     val state: StateFlow<ChatUiState> =
-        combine(repository.observe(), draft, status, error, pendingImage) { messages, d, s, e, p ->
-            ChatUiState(messages, d, s, e, p)
+        combine(combine(messages, draft, status, error, pendingImage) { m, d, s, e, p -> ChatUiState(m, d, s, e, p) }, currentSession) { ui, session ->
+            ui.copy(session = session)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     init {
@@ -73,6 +88,7 @@ class ChatViewModel(
     }
 
     private suspend fun prepareEngine() {
+        currentSession.value = sessions.mostRecentOrCreate()
         if (!withContext(Dispatchers.IO) { locator.isPresent() }) {
             status.value = EngineStatus.MODEL_MISSING
             return
@@ -89,10 +105,12 @@ class ChatViewModel(
     }
 
     private suspend fun restartConversation() {
-        val history = normalized(repository.recent(HISTORY_TURNS)).map { Turn(it.role == Role.USER, it.text) }
+        val session = currentSession.value ?: sessions.mostRecentOrCreate().also { currentSession.value = it }
+        val history = normalized(repository.recent(session.id, HISTORY_TURNS)).map { Turn(it.role == Role.USER, it.text) }
         val (prompt, available) = withContext(Dispatchers.IO) {
             val all = skills.list()
-            SkillPrompt.withSkills(persona.systemPrompt(), all) to all
+            val base = persona.systemPrompt() + session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty()
+            SkillPrompt.withSkills(base, all) to all
         }
         engine.startConversation(prompt, history, skills.takeIf { available.isNotEmpty() })
     }
@@ -131,11 +149,19 @@ class ChatViewModel(
             error.value = null
             draft.value = ""
             pendingImage.value = null
-            repository.add(ChatMessage(role = Role.USER, text = prompt, hasImage = image != null))
+            val session = currentSession.value ?: sessions.mostRecentOrCreate().also { currentSession.value = it }
+            repository.add(ChatMessage(sessionId = session.id, role = Role.USER, text = prompt, hasImage = image != null))
+            sessions.touch(session.id)
+            if (session.title == Session.DEFAULT_TITLE) {
+                // Titre automatique : le début du premier message.
+                val title = prompt.lineSequence().first().take(TITLE_LENGTH).trim().ifEmpty { Session.DEFAULT_TITLE }
+                sessions.rename(session.id, title)
+                currentSession.value = session.copy(title = title)
+            }
             val plan = planner.plan(prompt)
             if (plan is TurnPlan.Crisis) {
                 // Détresse aiguë : réponse fixe écrite en code, sans passer par le modèle.
-                repository.add(ChatMessage(role = Role.YAMY, text = plan.reply))
+                repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = plan.reply))
                 status.value = EngineStatus.READY
                 return@launch
             }
@@ -149,7 +175,7 @@ class ChatViewModel(
                         reply.append(piece)
                         draft.value = reply.toString()
                     }
-                    if (reply.isNotBlank()) repository.add(ChatMessage(role = Role.YAMY, text = reply.toString()))
+                    if (reply.isNotBlank()) repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = reply.toString()))
                 }
                 status.value = EngineStatus.READY
             } catch (e: CancellationException) {
@@ -177,6 +203,7 @@ class ChatViewModel(
                 draft.value = ""
                 error.value = null
                 wiper.wipeAll()
+                currentSession.value = sessions.mostRecentOrCreate()
             }
             if (status.value != EngineStatus.MODEL_MISSING) status.value = EngineStatus.READY
             onDone()
@@ -191,7 +218,7 @@ class ChatViewModel(
             val wasUsable = status.value != EngineStatus.MODEL_MISSING && status.value != EngineStatus.LOADING
             if (wasUsable) status.value = EngineStatus.LOADING
             conversationLock.withLock {
-                repository.clear()
+                currentSession.value?.let { repository.clear(it.id) }
                 draft.value = ""
                 error.value = null
                 if (wasUsable) {
@@ -205,6 +232,50 @@ class ChatViewModel(
                     }
                 }
             }
+        }
+    }
+
+    /** Ouvre une discussion existante : le moteur reprend avec son historique et son sujet. */
+    fun openSession(id: Long, onOpened: () -> Unit = {}) = switchTo(onOpened) { sessions.get(id) }
+
+    /** Crée une discussion (sujet optionnel) et l'ouvre. */
+    fun newSession(title: String, topic: String, onOpened: () -> Unit = {}) = switchTo(onOpened) { sessions.create(title, topic) }
+
+    fun deleteSession(id: Long) {
+        viewModelScope.launch {
+            if (currentSession.value?.id == id) {
+                sessions.delete(id)
+                switchTo { sessions.mostRecentOrCreate() }
+            } else {
+                sessions.delete(id)
+            }
+        }
+    }
+
+    private fun switchTo(onOpened: () -> Unit = {}, target: suspend () -> Session?) {
+        val running = generation
+        viewModelScope.launch {
+            running?.cancelAndJoin()
+            val session = target() ?: return@launch
+            val usable = status.value == EngineStatus.READY || status.value == EngineStatus.GENERATING
+            if (usable) status.value = EngineStatus.LOADING
+            conversationLock.withLock {
+                currentSession.value = session
+                draft.value = ""
+                error.value = null
+                pendingImage.value = null
+                if (usable) {
+                    try {
+                        restartConversation()
+                        status.value = EngineStatus.READY
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        fail(e)
+                    }
+                }
+            }
+            onOpened()
         }
     }
 
@@ -239,6 +310,7 @@ class ChatViewModel(
 
     companion object {
         private const val HISTORY_TURNS = 20
+        private const val TITLE_LENGTH = 40
         private const val DEFAULT_IMAGE_PROMPT = "Regarde cette photo et dis-moi ce que tu en penses."
     }
 }
