@@ -1,6 +1,15 @@
 # Yamy
 
-Compagnon IA Android **100 % local** : Gemma-4-E2B-it exécuté sur l'appareil via LiteRT-LM. Aucune permission `INTERNET`, aucun réseau. Cible : Pixel 10a.
+Compagnon IA Android **hors ligne par défaut** : Gemma-4-E2B-it exécuté sur l'appareil via LiteRT-LM. Cible : Pixel 10a.
+
+Depuis la v0.3, l'app déclare la permission `INTERNET`, utilisée **uniquement** par les connecteurs MCP (Gmail) et **seulement** en mode Connecté : switch dans Vie privée, **Hors ligne par défaut**, chaque email relu et confirmé par la personne. Le modèle, les discussions, la mémoire et la voix ne quittent jamais le téléphone.
+
+## Connecteurs MCP
+
+- Client MCP générique (`mcp/McpClient.kt`, JSON-RPC 2.0 : `initialize`, `tools/list`, `tools/call`).
+- Serveur [rr-djk/gmail-mcp-server](https://github.com/rr-djk/gmail-mcp-server) porté dans l'app (`mcp/gmail/GmailMcpServer.kt`) : même protocole et même outil `send_email`, plus un destinataire libre (`to`). Android ne lance pas un `java -jar` en stdio, d'où le transport en mémoire (`InProcessTransport`).
+- Gemma ne fait que **proposer** un email (outil `preparerEmail`) ; l'envoi part du bouton Envoyer, via `NetworkGate`, unique point de passage vers le réseau, fermé en mode Hors ligne.
+- Identifiants : adresse Gmail + mot de passe d'application, chiffrés (Keystore), effacés par « Tout effacer ».
 
 ## Contexte
 

@@ -22,6 +22,9 @@ Yamy est un compagnon conversationnel Android qui tourne **entièrement sur le t
 - Qualité : `docs/BANC_TEST.md` — 18/21 puis 21/21 réponses acceptables après corrections, **notées par l'IA qui a écrit le code** (à relire), un seul tirage.
 - Sécurité : audit indépendant de la couche confidentialité, correctifs appliqués ; risques restants listés dans `PLAN.md`.
 
+## Connecteurs MCP (v0.3)
+Yamy peut, si la personne l'active, se brancher sur des serveurs MCP. Premier connecteur : [gmail-mcp-server](https://github.com/rr-djk/gmail-mcp-server), porté dans l'app avec le même protocole JSON-RPC. **Hors ligne par défaut** : un switch visible passe en mode Connecté, Gemma ne fait que proposer un email, et la personne confirme chaque envoi.
+
 ## Limites assumées
 - Yamy n'est pas un professionnel de santé ; le détecteur par mots-clés peut rater des formulations indirectes.
 - Numéros d'aide à adapter au pays (3114, 15, 3919, 17, 9-8-8, 112 par défaut).
