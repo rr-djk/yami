@@ -86,3 +86,10 @@ Une étape = une branche `step/NN-nom`, fusionnée `--no-ff` dans `main`. Commit
 - `docs/MESURES.md` : performances du Pixel 10a
 - `docs/BANC_TEST.md` : banc de sécurité (21 messages) et ses limites
 - `AGENTS.md` : consignes pour les agents de code
+
+## Licence
+
+Code source sous **licence Apache 2.0** : voir [`LICENSE`](LICENSE) et [`NOTICE`](NOTICE).
+
+- **Modèle utilisé** : [Gemma-4-E2B-it](https://huggingface.co/google/gemma-4-E2B-it) de Google DeepMind, distribué sous licence Apache 2.0 ([fiche du modèle](https://ai.google.dev/gemma/docs/core/model_card_4), version LiteRT-LM : [litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)). Il n'est pas inclus dans ce dépôt : il se copie sur le téléphone avec `adb push`.
+- **Polices** : Macondo et JetBrains Mono, sous SIL Open Font License 1.1.
