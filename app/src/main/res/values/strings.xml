@@ -2,4 +2,9 @@
 <resources>
     <string name="app_name">Yamy</string>
     <string name="tagline">Dis-lui tout. Rien ne quitte ton téléphone.</string>
+    <string name="empty_chat">Salut, c\'est Yamy. Dis-moi ce qui te passe par la tête.</string>
+    <string name="input_hint">Écris à Yamy…</string>
+    <string name="send">Envoyer</string>
+    <string name="clear_conversation">Effacer</string>
+    <string name="model_missing">Modèle introuvable. Copie-le avec adb push vers :\n%1$s</string>
 </resources>
