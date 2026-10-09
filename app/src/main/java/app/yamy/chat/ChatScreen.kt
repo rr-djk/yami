@@ -1,6 +1,10 @@
 package app.yamy.chat
 
 import android.Manifest
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.graphics.BitmapFactory
@@ -123,10 +127,14 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
     val rows = remember(ui.messages, ui.draft) {
         if (ui.draft.isBlank() || ui.messages.lastOrNull()?.text == ui.draft) ui.messages else ui.messages + ChatMessage(id = -1, role = Role.YAMY, text = ui.draft)
     }
-    val thinking = ui.status == EngineStatus.GENERATING && ui.draft.isBlank()
+    val run = ui.chainRun?.takeIf { it.summary == null || ui.messages.lastOrNull()?.text != it.summary }
+    val thinking = ui.status == EngineStatus.GENERATING && ui.draft.isBlank() && run == null
+    val chains by viewModel.chains.collectAsState()
+    var agentsMenu by remember { mutableStateOf(false) }
+    val inputFocus = remember { FocusRequester() }
     // Liste inversée (index 0 = bas) : la réponse qui s'allonge reste collée en bas de l'écran.
     // On ne suit le flux que si l'utilisateur est déjà en bas, pour ne pas l'empêcher de remonter lire.
-    LaunchedEffect(rows.size, thinking) {
+    LaunchedEffect(rows.size, thinking, run?.steps?.size) {
         if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
     }
 
@@ -173,6 +181,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (run != null) item(key = AGENTS_KEY) { AgentsPanel(run.steps) }
                     if (thinking) item(key = THINKING_KEY) { ThinkingBubble() }
                     items(rows.asReversed(), key = { it.id.takeIf { id -> id != -1L } ?: Long.MIN_VALUE }) { MessageBubble(it) }
                 }
@@ -213,6 +222,28 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
                 },
                 enabled = canAttach,
             ) { Text(stringResource(R.string.attach_camera)) }
+            if (chains.isNotEmpty()) {
+                Box {
+                    RetroOutlinedButton(onClick = { agentsMenu = true }, enabled = canAttach) { Text(stringResource(R.string.agents)) }
+                    DropdownMenu(expanded = agentsMenu, onDismissRequest = { agentsMenu = false }, containerColor = RetroColors.Surface) {
+                        chains.forEach { chain ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(chain.agents.joinToString(" ") { it.emoji } + "  /" + chain.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(chain.description, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                },
+                                onClick = {
+                                    agentsMenu = false
+                                    input = "/${chain.name} "
+                                    inputFocus.requestFocus()
+                                },
+                            )
+                        }
+                    }
+                }
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -222,7 +253,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit) 
             RetroTextField(
                 value = input,
                 onValueChange = { input = it },
-                modifier = Modifier.weight(1f).semantics { contentDescription = "Message pour Yamy" },
+                modifier = Modifier.weight(1f).focusRequester(inputFocus).semantics { contentDescription = "Message pour Yamy" },
                 placeholder = { Text(stringResource(R.string.input_hint)) },
                 maxLines = if (imeVisible) 3 else 4,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
@@ -278,6 +309,7 @@ private fun Notice(text: String, technical: Boolean = false, isError: Boolean = 
 }
 
 private const val THINKING_KEY = "thinking"
+private const val AGENTS_KEY = "agents"
 
 /** Affiché entre l'envoi et le premier mot de la réponse. */
 @Composable

@@ -13,6 +13,10 @@ import app.yamy.safety.TurnPlan
 import app.yamy.safety.TurnPlanner
 import app.yamy.skills.SkillPrompt
 import app.yamy.skills.SkillRepository
+import app.yamy.agents.AgentStep
+import app.yamy.agents.Chain
+import app.yamy.agents.ChainFormat
+import app.yamy.agents.ChainRunner
 import app.yamy.vision.ImageSource
 import app.yamy.voice.SegmenterEvent
 import app.yamy.voice.Speaker
@@ -41,6 +45,9 @@ import kotlinx.coroutines.withContext
 enum class EngineStatus { LOADING, READY, LISTENING, GENERATING, MODEL_MISSING, ERROR }
 
 /** Écoute en cours : niveaux récents pour l'onde, durée, et texte déjà transcrit. */
+/** Chaîne d'agents en cours (ou terminée, jusqu'à ce que son résumé arrive de la base). */
+data class ChainRunUi(val steps: List<AgentStep>, val summary: String? = null)
+
 data class VoiceUi(val levels: List<Float> = emptyList(), val seconds: Int = 0, val transcript: String = "")
 
 /** Photo en attente d'envoi, gardée en mémoire seulement. */
@@ -55,6 +62,7 @@ data class ChatUiState(
     val pendingImage: PendingImage? = null,
     val session: Session? = null,
     val voice: VoiceUi? = null,
+    val chainRun: ChainRunUi? = null,
 )
 
 class ChatViewModel(
@@ -68,6 +76,7 @@ class ChatViewModel(
     private val sessions: SessionRepository,
     private val recorder: VoiceRecorder,
     private val speaker: Speaker,
+    private val chainRunner: ChainRunner,
     private val planner: TurnPlanner = TurnPlanner(),
 ) : ViewModel() {
 
@@ -77,6 +86,11 @@ class ChatViewModel(
     private val pendingImage = MutableStateFlow<PendingImage?>(null)
     private val currentSession = MutableStateFlow<Session?>(null)
     private val voice = MutableStateFlow<VoiceUi?>(null)
+    private val chainRun = MutableStateFlow<ChainRunUi?>(null)
+    private val _chains = MutableStateFlow<List<Chain>>(emptyList())
+
+    /** Chaînes d'agents disponibles (livrées avec l'app ou créées par la personne). */
+    val chains: StateFlow<List<Chain>> = _chains
     private var voiceJob: Job? = null
 
     /** Yamy est en train de parler (réponse à un message vocal). */
@@ -96,8 +110,8 @@ class ChatViewModel(
     }
 
     val state: StateFlow<ChatUiState> =
-        combine(combine(messages, draft, status, error, pendingImage) { m, d, s, e, p -> ChatUiState(m, d, s, e, p) }, currentSession, voice) { ui, session, v ->
-            ui.copy(session = session, voice = v)
+        combine(combine(messages, draft, status, error, pendingImage) { m, d, s, e, p -> ChatUiState(m, d, s, e, p) }, currentSession, voice, chainRun) { ui, session, v, c ->
+            ui.copy(session = session, voice = v, chainRun = c)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     init {
@@ -126,6 +140,7 @@ class ChatViewModel(
         val history = normalized(repository.recent(session.id, HISTORY_TURNS)).map { Turn(it.role == Role.USER, it.text) }
         val (prompt, available) = withContext(Dispatchers.IO) {
             val all = skills.list()
+            _chains.value = all.mapNotNull { ChainFormat.parse(it) }
             val base = persona.systemPrompt() + session.topic.takeIf { it.isNotBlank() }?.let { "\n\n## Sujet de cette discussion\n$it" }.orEmpty()
             SkillPrompt.withSkills(base, all) to all
         }
@@ -161,7 +176,58 @@ class ChatViewModel(
         val image = pendingImage.value
         val prompt = text.trim().ifEmpty { if (image != null) DEFAULT_IMAGE_PROMPT else return }
         if (status.value != EngineStatus.READY) return
-        launchTurn(prompt, image, viaVoice = false)
+        val chain = prompt.takeIf { it.startsWith("/") }?.let { command ->
+            val name = command.removePrefix("/").substringBefore(' ').trim()
+            _chains.value.firstOrNull { it.name == name }
+        }
+        if (chain != null) {
+            launchChain(chain, prompt, prompt.substringAfter(' ', "").trim(), image)
+        } else {
+            launchTurn(prompt, image, viaVoice = false)
+        }
+    }
+
+    /**
+     * Lance une chaîne d'agents : chaque agent travaille à l'écran, puis le résumé est enregistré
+     * dans la discussion. La détection de détresse passe avant, comme pour un message normal.
+     */
+    private fun launchChain(chain: Chain, shown: String, request: String, image: PendingImage?) {
+        generation = viewModelScope.launch {
+            status.value = EngineStatus.GENERATING
+            error.value = null
+            draft.value = ""
+            chainRun.value = null
+            pendingImage.value = null
+            val session = currentSession.value ?: sessions.mostRecentOrCreate().also { currentSession.value = it }
+            repository.add(ChatMessage(sessionId = session.id, role = Role.USER, text = shown, hasImage = image != null))
+            sessions.touch(session.id)
+            val plan = planner.plan(request)
+            if (plan is TurnPlan.Crisis) {
+                repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = plan.reply))
+                status.value = EngineStatus.READY
+                return@launch
+            }
+            try {
+                var last = emptyList<AgentStep>()
+                conversationLock.withLock {
+                    chainRunner.run(chain, request, image?.bytes).collect { steps ->
+                        last = steps
+                        chainRun.value = ChainRunUi(steps)
+                    }
+                    val summary = ChainRunner.summary(last)
+                    repository.add(ChatMessage(sessionId = session.id, role = Role.YAMY, text = summary))
+                    // Le panneau reste affiché jusqu'à ce que le résumé arrive de la base (pas de clignotement).
+                    chainRun.value = ChainRunUi(last, summary)
+                }
+                status.value = EngineStatus.READY
+            } catch (e: CancellationException) {
+                chainRun.value = null
+                throw e
+            } catch (e: Throwable) {
+                chainRun.value = null
+                recoverFromTurnError(e)
+            }
+        }
     }
 
     /**
@@ -237,6 +303,7 @@ class ChatViewModel(
 
     private fun launchTurn(prompt: String, image: PendingImage?, viaVoice: Boolean) {
         generation = viewModelScope.launch {
+            chainRun.value = null
             status.value = EngineStatus.GENERATING
             error.value = null
             draft.value = ""
@@ -360,6 +427,7 @@ class ChatViewModel(
             if (usable) status.value = EngineStatus.LOADING
             conversationLock.withLock {
                 currentSession.value = session
+                chainRun.value = null
                 draft.value = ""
                 error.value = null
                 pendingImage.value = null
