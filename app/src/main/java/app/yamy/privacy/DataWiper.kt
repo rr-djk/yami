@@ -17,14 +17,17 @@ class DataWiper(
     private val memory: MemoryRepository,
     /** Réinstalle ce qui est livré avec l'app (chaînes d'agents) après l'effacement. */
     private val restoreDefaults: () -> Unit = {},
+    /** Coupe les connecteurs (jeton + mode Hors ligne). Exécuté en premier, quoi qu'il arrive ensuite. */
+    private val resetConnectors: () -> Unit = {},
 ) {
     suspend fun wipeAll() {
+        resetConnectors()
         sessions.deleteAll()
         skills.deleteAll()
         memory.deleteAll()
         File(filesDir, AssetPersonaProvider.FILE_NAME).delete()
         File(cacheDir, "camera").deleteRecursively()
         engine.invalidateConversation()
-        restoreDefaults()
+        runCatching { restoreDefaults() }
     }
 }

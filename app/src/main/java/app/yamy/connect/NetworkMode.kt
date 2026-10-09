@@ -14,15 +14,28 @@ class NetworkModeStore(context: Context) {
     private val _mode = MutableStateFlow(read())
     val mode: StateFlow<NetworkMode> = _mode.asStateFlow()
 
+    /** Octets réseau de l'app au moment du passage en Hors ligne : l'audit vérifie qu'ils n'ont pas bougé. */
+    @Volatile var offlineBaseline: Long = trafficBytes()
+        private set
+
     fun set(mode: NetworkMode) {
         prefs.edit().putString(KEY, mode.name).apply()
+        if (mode == NetworkMode.OFFLINE) offlineBaseline = trafficBytes()
         _mode.value = mode
     }
 
     private fun read() = runCatching { NetworkMode.valueOf(prefs.getString(KEY, null) ?: "") }.getOrDefault(NetworkMode.OFFLINE)
 
-    private companion object {
-        const val KEY = "mode"
+    companion object {
+        private const val KEY = "mode"
+
+        /** Compteur d'Android (octets envoyés + reçus par cette app), -1 s'il n'est pas disponible. */
+        fun trafficBytes(): Long {
+            val uid = android.os.Process.myUid()
+            val tx = android.net.TrafficStats.getUidTxBytes(uid)
+            val rx = android.net.TrafficStats.getUidRxBytes(uid)
+            return if (tx < 0 || rx < 0) -1 else tx + rx
+        }
     }
 }
 

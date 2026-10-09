@@ -1,6 +1,9 @@
 package app.yamy.chat
 
 import android.Manifest
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.focus.FocusRequester
@@ -101,8 +104,8 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, 
     val speaking by viewModel.speaking.collectAsState()
     val scribe by viewModel.scribeState.collectAsState()
     val network by viewModel.networkMode.collectAsState()
-    val pendingEmail by viewModel.pendingEmail.collectAsState()
-    val sendingEmail by viewModel.sendingEmail.collectAsState()
+    val pendingMessage by viewModel.pendingMessage.collectAsState()
+    val sending by viewModel.sending.collectAsState()
     var micDenied by rememberSaveable { mutableStateOf(false) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         micDenied = !granted
@@ -199,8 +202,17 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onBack: () -> Unit, 
                 Text(it, color = MaterialTheme.colorScheme.error, style = TechnicalTextStyle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
         }
-        pendingEmail?.let {
-            EmailConfirmCard(it, connected = network == NetworkMode.CONNECTED, sending = sendingEmail, onSend = viewModel::confirmEmail, onCancel = viewModel::cancelEmail)
+        pendingMessage?.let {
+            Box(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                DiscordConfirmCard(
+                    it,
+                    connected = network == NetworkMode.CONNECTED,
+                    sending = sending,
+                    generating = ui.status == EngineStatus.GENERATING,
+                    onSend = { viewModel.confirmMessage(it) },
+                    onCancel = viewModel::cancelMessage,
+                )
+            }
         }
         scribe?.let { ScribeBanner(it, onUndo = viewModel::undoRemember, onDismiss = viewModel::dismissScribe) }
         if (micDenied) {

@@ -85,7 +85,7 @@ class MainActivity : FragmentActivity() {
         var tab by rememberSaveable { mutableStateOf(Tab.SESSIONS) }
         val chat = viewModel<ChatViewModel>(
             factory = factory {
-                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe, app.networkMode, app.gmail)
+                ChatViewModel(app.engine, app.conversations, app.persona, app.modelLocator, app.imageSource, app.skills, app.dataWiper, app.sessions, app.voiceRecorder, app.speaker, app.chainRunner, app.memory, app.scribe, app.networkMode, app.discord)
             },
         )
         if (inChat) {
@@ -122,7 +122,7 @@ class MainActivity : FragmentActivity() {
                     }
                     Tab.PRIVACY -> PrivacyScreen(
                         audit = app.privacyAudit,
-                        connectors = { ConnectorsSection(app.networkMode, app.gmailCredentials) },
+                        connectors = { ConnectorsSection(app.networkMode, app.discordToken, onChanged = chat::invalidateEngine, onTest = chat::refreshDiscordChannels) },
                         onWipe = { chat.wipeAll { tab = Tab.SESSIONS } },
                         onClose = { tab = Tab.SESSIONS },
                     )

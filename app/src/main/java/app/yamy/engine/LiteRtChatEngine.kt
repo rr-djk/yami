@@ -1,7 +1,7 @@
 package app.yamy.engine
 
 import android.content.Context
-import app.yamy.mcp.EmailDrafts
+import app.yamy.mcp.discord.DiscordDrafts
 import app.yamy.skills.SkillLookup
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
@@ -57,7 +57,7 @@ class LiteRtChatEngine(
         }
     }
 
-    override suspend fun startConversation(systemPrompt: String?, history: List<Turn>, skills: SkillLookup?, notes: SkillLookup?, emailDrafts: EmailDrafts?) {
+    override suspend fun startConversation(systemPrompt: String?, history: List<Turn>, skills: SkillLookup?, notes: SkillLookup?, discordDrafts: DiscordDrafts?) {
         lifecycle.withLock {
             val loaded = checkNotNull(engine) { "Moteur non chargé" }
             withContext(Dispatchers.Default) {
@@ -70,7 +70,7 @@ class LiteRtChatEngine(
                         tools = listOfNotNull(
                             skills?.let { tool(SkillToolSet(it)) },
                             notes?.let { tool(NoteToolSet(it)) },
-                            emailDrafts?.let { tool(EmailToolSet(it)) },
+                            discordDrafts?.let { tool(DiscordToolSet(it)) },
                         ),
                     ),
                 )
