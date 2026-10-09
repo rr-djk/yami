@@ -2,7 +2,10 @@
 <resources>
     <string name="app_name">Yamy</string>
     <string name="tagline">Dis-lui tout. Rien ne quitte ton téléphone.</string>
-    <string name="empty_chat">Salut, c\'est Yamy. Dis-moi ce qui te passe par la tête.</string>
+    <string name="welcome_title">Salut, c\'est Yamy.</string>
+    <string name="welcome_body">Comment puis-je t\'aider aujourd\'hui ?
+
+De quoi as-tu envie de parler : une journée à raconter, une question, un souci, une photo à me montrer ? Je suis là, prends ton temps.</string>
     <string name="input_hint">Écris à Yamy…</string>
     <string name="send">Envoyer</string>
     <string name="clear_conversation">Effacer</string>
@@ -37,5 +40,5 @@
     <string name="cancel">Annuler</string>
     <string name="locked_title">Yamy est verrouillé</string>
     <string name="unlock">Déverrouiller</string>
-    <string name="ai_disclaimer">Yamy est une IA, pas un professionnel de santé.</string>
+    <string name="ai_disclaimer">Yamy est une IA, elle peut se tromper.</string>
 </resources>

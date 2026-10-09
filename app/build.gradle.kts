@@ -21,6 +21,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Signature de démonstration (clé de debug locale) : à remplacer par une vraie clé pour publier.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
