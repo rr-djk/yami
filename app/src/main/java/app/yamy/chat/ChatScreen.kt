@@ -7,6 +7,17 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +67,7 @@ import app.yamy.ui.components.RetroTextField
 import app.yamy.ui.theme.RetroColors
 import app.yamy.ui.theme.TechnicalTextStyle
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit, onOpenPrivacy: () -> Unit) {
     val ui by viewModel.state.collectAsState()
@@ -75,6 +87,19 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
         }
     }
     val canAttach = ui.status == EngineStatus.READY
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val imeVisible = WindowInsets.isImeVisible
+    val canSend = ui.status == EngineStatus.READY && (input.isNotBlank() || ui.pendingImage != null)
+
+    /** Envoie puis ferme le clavier, pour laisser toute la place à la réponse. */
+    fun submit() {
+        if (!canSend) return
+        viewModel.send(input)
+        input = ""
+        keyboard?.hide()
+        focusManager.clearFocus()
+    }
 
     val rows = remember(ui.messages, ui.draft) {
         if (ui.draft.isBlank() || ui.messages.lastOrNull()?.text == ui.draft) ui.messages else ui.messages + ChatMessage(id = -1, role = Role.YAMY, text = ui.draft)
@@ -107,7 +132,15 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
                 trackColor = RetroColors.Surface,
             )
         }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+        // Toucher la conversation ferme le clavier.
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth().pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                })
+            },
+        ) {
             when {
                 ui.status == EngineStatus.MODEL_MISSING -> Notice(stringResource(R.string.model_missing, modelPath), technical = true)
                 ui.status == EngineStatus.ERROR -> Notice(ui.error.orEmpty(), technical = true, isError = true)
@@ -129,7 +162,8 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             }
         }
         ui.pendingImage?.let { PendingImageChip(it, viewModel::discardImage) }
-        Row(
+        // Clavier ouvert : on masque les boutons photo et la mention pour garder la conversation visible.
+        if (!imeVisible) Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -157,21 +191,28 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f).semantics { contentDescription = "Message pour Yamy" },
                 placeholder = { Text(stringResource(R.string.input_hint)) },
-                maxLines = 4,
+                maxLines = if (imeVisible) 3 else 4,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { submit() }),
             )
-            RetroButton(
-                onClick = {
-                    viewModel.send(input)
-                    input = ""
-                },
-                enabled = ui.status == EngineStatus.READY && (input.isNotBlank() || ui.pendingImage != null),
-            ) { Text(stringResource(R.string.send)) }
+            RetroButton(onClick = ::submit, enabled = canSend) { Text(stringResource(R.string.send)) }
         }
-        Text(
-            stringResource(R.string.ai_disclaimer),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-        )
+        if (imeVisible) {
+            RetroTextButton(
+                onClick = {
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                },
+                label = stringResource(R.string.hide_keyboard),
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        } else {
+            Text(
+                stringResource(R.string.ai_disclaimer),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            )
+        }
     }
 }
 
