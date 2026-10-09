@@ -160,6 +160,11 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
                 enabled = ui.status == EngineStatus.READY && (input.isNotBlank() || ui.pendingImage != null),
             ) { Text(stringResource(R.string.send)) }
         }
+        Text(
+            stringResource(R.string.ai_disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+        )
     }
 }
 

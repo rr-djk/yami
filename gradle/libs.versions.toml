@@ -10,6 +10,8 @@ coroutines = "1.10.2"
 room = "2.8.5"
 ksp = "2.3.12"
 junit = "4.13.2"
+testRunner = "1.6.2"
+testExtJunit = "1.2.1"
 biometric = "1.2.0-alpha05"
 sqlcipher = "4.19.1"
 sqlite = "2.5.2"
@@ -34,6 +36,8 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
 androidx-sqlite = { group = "androidx.sqlite", name = "sqlite", version.ref = "sqlite" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "testRunner" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "testExtJunit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
