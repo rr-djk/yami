@@ -1,0 +1,18 @@
+# Android / Gradle
+build/
+.gradle/
+.idea/
+local.properties
+*.iml
+captures/
+.cxx/
+
+# Artefacts lourds : le modèle ne doit jamais entrer dans git
+*.litertlm
+*.task
+*.apk
+*.aab
+
+# Secrets
+*.jks
+*.keystore
