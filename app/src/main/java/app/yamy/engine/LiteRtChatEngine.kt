@@ -34,7 +34,10 @@ class LiteRtChatEngine(
     @Volatile private var loadedBackend: ComputeBackend? = null
     private val lifecycle = Mutex()
 
-    override val hasConversation: Boolean get() = conversation != null
+    /** Marquée périmée par [invalidateConversation] : elle sera remplacée au prochain tour, sans être fermée en plein flux. */
+    @Volatile private var stale = false
+
+    override val hasConversation: Boolean get() = conversation != null && !stale
 
     override suspend fun load(backend: ComputeBackend) = lifecycle.withLock {
         if (engine != null && loadedBackend == backend) return@withLock
@@ -58,6 +61,7 @@ class LiteRtChatEngine(
             val loaded = checkNotNull(engine) { "Moteur non chargé" }
             withContext(Dispatchers.Default) {
                 conversation?.close()
+                stale = false
                 conversation = loaded.createConversation(
                     ConversationConfig(
                         systemInstruction = systemPrompt?.let { Contents.of(it) },
@@ -70,12 +74,7 @@ class LiteRtChatEngine(
     }
 
     override suspend fun invalidateConversation() {
-        lifecycle.withLock {
-            withContext(Dispatchers.Default) {
-                conversation?.close()
-                conversation = null
-            }
-        }
+        stale = true
     }
 
     override fun send(input: ChatInput): Flow<String> {

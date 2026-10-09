@@ -15,6 +15,8 @@ class DataWiper(
     private val filesDir: File,
     private val cacheDir: File,
     private val memory: MemoryRepository,
+    /** Réinstalle ce qui est livré avec l'app (chaînes d'agents) après l'effacement. */
+    private val restoreDefaults: () -> Unit = {},
 ) {
     suspend fun wipeAll() {
         sessions.deleteAll()
@@ -23,5 +25,6 @@ class DataWiper(
         File(filesDir, AssetPersonaProvider.FILE_NAME).delete()
         File(cacheDir, "camera").deleteRecursively()
         engine.invalidateConversation()
+        restoreDefaults()
     }
 }

@@ -3,6 +3,8 @@ package app.yamy.memory
 import app.yamy.chat.ChatMessage
 import app.yamy.chat.Role
 import app.yamy.engine.ChatEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Résultat d'un passage du Scribe : les notes écrites et leur version précédente (pour Annuler). */
 data class ScribeResult(val written: List<MemoryNote>, val previous: Map<String, MemoryNote?>, val raw: String = "")
@@ -18,7 +20,7 @@ class Scribe(private val engine: ChatEngine, private val memory: MemoryRepositor
             (if (it.role == Role.USER) "Personne : " else "Yamy : ") + it.text.take(MAX_CHARS)
         }
         if (transcript.isBlank()) return ScribeResult(emptyList(), emptyMap())
-        val existing = memory.list()
+        val existing = withContext(Dispatchers.IO) { memory.list() }
         val raw = engine.complete(SYSTEM, buildString {
             appendLine("Notes existantes :")
             appendLine(MemoryFormat.index(existing).ifBlank { "(aucune)" })
@@ -27,14 +29,21 @@ class Scribe(private val engine: ChatEngine, private val memory: MemoryRepositor
             append(transcript)
         })
         val updates = MemoryFormat.parseScribe(raw)
-        val previous = updates.associate { it.name to memory.get(it.name) }
-        val written = updates.map { update -> MemoryFormat.merge(previous[update.name], update).also(memory::save) }
-        return ScribeResult(written, previous, raw)
+        return withContext(Dispatchers.IO) {
+            val previous = updates.associate { it.name to memory.get(it.name) }
+            val written = updates.map { update -> MemoryFormat.merge(previous[update.name], update).also(memory::save) }
+            ScribeResult(written, previous, raw)
+        }
     }
 
     /** Annule un passage : restaure les notes modifiées, supprime celles qui ont été créées. */
     fun undo(result: ScribeResult) {
-        result.previous.forEach { (name, before) -> if (before == null) memory.delete(name) else memory.save(before) }
+        result.written.forEach { written ->
+            // Si la personne a modifié la note entre-temps, on respecte sa version.
+            if (memory.get(written.name) != written) return@forEach
+            val before = result.previous[written.name]
+            if (before == null) memory.delete(written.name) else memory.save(before)
+        }
     }
 
     private companion object {

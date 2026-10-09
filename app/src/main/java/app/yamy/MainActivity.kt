@@ -64,7 +64,12 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) app.appLock.onAppLeft()
+        if (!isChangingConfigurations) {
+            app.appLock.onAppLeft()
+            // Rien ne doit continuer à écouter ou à lire une réponse à voix haute derrière l'écran de verrouillage.
+            app.voiceRecorder.stop()
+            app.speaker.stop()
+        }
     }
 
     override fun onStart() {

@@ -26,6 +26,7 @@ class FileMemoryRepository(private val root: File, private val box: SecretBox) :
 
     override fun get(name: String): MemoryNote? = file(name)?.takeIf { it.isFile }?.let { read(it) }
 
+    @Synchronized
     override fun save(note: MemoryNote) {
         val valid = requireNotNull(MemoryFormat.valid(note)) { "Note invalide" }
         root.mkdirs()

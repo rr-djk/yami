@@ -48,7 +48,7 @@ class YamyApp : Application() {
     private val database: AppDatabase by lazy { AppDatabase.create(this, databasePassphrase()) }
     val conversations: ConversationRepository by lazy { RoomConversationRepository(database.messageDao()) }
     val sessions: SessionRepository by lazy { RoomSessionRepository(database) }
-    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir, memory) }
+    val dataWiper: DataWiper by lazy { DataWiper(sessions, skills, engine, filesDir, cacheDir, memory) { ChainCatalog.installDefaults(assets, skills) } }
 
     override fun onCreate() {
         super.onCreate()
@@ -71,6 +71,7 @@ class YamyApp : Application() {
             deleteDatabase("yamy-secure.db")
             secretBox.destroyKey()
             java.io.File(filesDir, "skills").deleteRecursively()
+            java.io.File(filesDir, "memoire").deleteRecursively()
             store.get()
         }
     }

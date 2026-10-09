@@ -30,7 +30,11 @@ class Speaker(context: Context) {
 
     private fun configure() {
         val offline = tts.voices.orEmpty()
-            .filter { it.locale.language == Locale.FRENCH.language && !it.isNetworkConnectionRequired }
+            .filter {
+                it.locale.language == Locale.FRENCH.language &&
+                    !it.isNetworkConnectionRequired &&
+                    "notInstalled" !in it.features.orEmpty()
+            }
             .minByOrNull { if (it.locale.country == "FR") 0 else 1 }
         if (offline == null) return
         tts.voice = offline

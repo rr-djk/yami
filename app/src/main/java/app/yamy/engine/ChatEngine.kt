@@ -38,7 +38,10 @@ interface ChatEngine : AutoCloseable {
         notes: SkillLookup? = null,
     )
 
-    /** Oublie la conversation courante : la prochaine doit être redémarrée. */
+    /**
+     * Marque la conversation courante comme périmée : le prochain tour la redémarre. Ne la ferme pas
+     * immédiatement, pour ne jamais couper une réponse en cours de génération.
+     */
     suspend fun invalidateConversation()
 
     /** Envoie un message et émet la réponse au fil de sa génération. */

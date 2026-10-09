@@ -36,8 +36,8 @@ class VoiceRecorder {
             AudioFormat.ENCODING_PCM_16BIT,
             maxOf(minBuffer, segmenter.frameSamples * 4),
         )
-        check(recorder.state == AudioRecord.STATE_INITIALIZED) { "Micro indisponible" }
         try {
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) { "Micro indisponible" }
             recorder.startRecording()
             val frame = ShortArray(segmenter.frameSamples)
             while (coroutineContext.isActive) {
@@ -57,7 +57,7 @@ class VoiceRecorder {
                 if (events.any { it is SegmenterEvent.Finished }) break
             }
         } finally {
-            recorder.stop()
+            runCatching { recorder.stop() }
             recorder.release()
         }
     }.flowOn(Dispatchers.IO)
