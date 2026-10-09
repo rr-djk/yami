@@ -20,19 +20,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
-import androidx.compose.material3.OutlinedButton
 import java.io.File
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +44,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yamy.R
+import app.yamy.ui.components.RetroButton
+import app.yamy.ui.components.RetroCard
+import app.yamy.ui.components.RetroOutlinedButton
+import app.yamy.ui.components.RetroRule
+import app.yamy.ui.components.RetroTextButton
+import app.yamy.ui.components.RetroTextField
+import app.yamy.ui.theme.RetroColors
+import app.yamy.ui.theme.TechnicalTextStyle
 
 @Composable
 fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> Unit) {
@@ -80,24 +83,29 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, color = RetroColors.Secondary)
             Row {
-                TextButton(onClick = onOpenSkills, enabled = ui.status == EngineStatus.READY) { Text(stringResource(R.string.skills)) }
-                TextButton(onClick = viewModel::clearConversation) { Text(stringResource(R.string.clear_conversation)) }
+                RetroTextButton(onClick = onOpenSkills, label = stringResource(R.string.skills), enabled = ui.status == EngineStatus.READY)
+                RetroTextButton(onClick = viewModel::clearConversation, label = stringResource(R.string.clear_conversation))
             }
         }
+        RetroRule()
         if (ui.status == EngineStatus.LOADING || ui.status == EngineStatus.GENERATING) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = RetroColors.Secondary,
+                trackColor = RetroColors.Surface,
+            )
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
-                ui.status == EngineStatus.MODEL_MISSING -> Notice(stringResource(R.string.model_missing, modelPath))
-                ui.status == EngineStatus.ERROR -> Notice(ui.error.orEmpty())
+                ui.status == EngineStatus.MODEL_MISSING -> Notice(stringResource(R.string.model_missing, modelPath), technical = true)
+                ui.status == EngineStatus.ERROR -> Notice(ui.error.orEmpty(), technical = true, isError = true)
                 rows.isEmpty() -> Notice(stringResource(R.string.empty_chat))
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(rows, key = { it.id.takeIf { id -> id != -1L } ?: Long.MIN_VALUE }) { MessageBubble(it) }
                 }
@@ -105,7 +113,7 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
         }
         if (ui.status != EngineStatus.ERROR) {
             ui.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                Text(it, color = MaterialTheme.colorScheme.error, style = TechnicalTextStyle, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
         }
         ui.pendingImage?.let { PendingImageChip(it, viewModel::discardImage) }
@@ -113,11 +121,11 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(
+            RetroOutlinedButton(
                 onClick = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 enabled = canAttach,
             ) { Text(stringResource(R.string.attach_gallery)) }
-            OutlinedButton(
+            RetroOutlinedButton(
                 onClick = {
                     val file = File(File(context.cacheDir, "camera").apply { mkdirs() }, "capture.jpg")
                     val uri = FileProvider.getUriForFile(context, "${context.packageName}.camera", file)
@@ -132,14 +140,14 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
+            RetroTextField(
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f).semantics { contentDescription = "Message pour Yamy" },
                 placeholder = { Text(stringResource(R.string.input_hint)) },
                 maxLines = 4,
             )
-            Button(
+            RetroButton(
                 onClick = {
                     viewModel.send(input)
                     input = ""
@@ -151,9 +159,13 @@ fun ChatScreen(viewModel: ChatViewModel, modelPath: String, onOpenSkills: () -> 
 }
 
 @Composable
-private fun Notice(text: String) {
+private fun Notice(text: String, technical: Boolean = false, isError: Boolean = false) {
     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text,
+            style = if (technical) TechnicalTextStyle else MaterialTheme.typography.headlineSmall,
+            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -161,13 +173,11 @@ private fun Notice(text: String) {
 private fun MessageBubble(message: ChatMessage) {
     val mine = message.role == Role.USER
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (mine) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(0.85f),
+        RetroCard(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            containerColor = if (mine) RetroColors.Primary else RetroColors.Surface,
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 if (message.hasImage) {
                     Text(stringResource(R.string.photo_label), style = MaterialTheme.typography.labelMedium)
                 }
@@ -194,6 +204,6 @@ private fun PendingImageChip(image: PendingImage, onRemove: () -> Unit) {
                 modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
             )
         }
-        TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_image)) }
+        RetroTextButton(onClick = onRemove, label = stringResource(R.string.remove_image))
     }
 }

@@ -65,9 +65,10 @@ Yamy est un compagnon conversationnel qui tourne **entièrement sur le télépho
 | 4 | `step/04-chat` | 3:15–4:30 | Chat streaming, `PERSONA.md`, Room | 10 échanges en mode avion |
 | 5 | `step/05-vision` | 4:30–5:30 | Image → E2B, cas d'usage | Image comprise de façon fiable |
 | 6 | `step/06-skills` | 5:30–6:30 | `SKILL.md`, `load_skill`, dictée + relecture | Un skill dicté puis utilisé |
-| 7 | `step/07-privacy` | 6:30–7:00 | `allowBackup=false`, `FLAG_SECURE`, Keystore, biométrie, « Tout effacer » | Checklist §6 cochée |
-| 8 | `step/08-safety-eval` | 7:00–7:40 | `DistressDetector`, banc 18+ messages, tests JVM | Score X/18 consigné |
-| 9 | `step/09-demo` | 7:40–8:00 | README, vidéo plan B, soumission | Livrables §8 |
+| 7 | `step/07-design-retro` | (ajout) | Thème rétro (skill `retro-style`) : Macondo + JetBrains Mono embarquées, palette bleu/violet, cartes à ombre dure | Rendu à valider sur le Pixel |
+| 8 | `step/08-privacy` | 6:30–7:00 | `allowBackup=false`, `FLAG_SECURE`, Keystore, biométrie, « Tout effacer » | Checklist §6 cochée |
+| 9 | `step/09-safety-eval` | 7:00–7:40 | `DistressDetector`, banc 18+ messages, tests JVM | Score X/18 consigné |
+| 10 | `step/10-demo` | 7:40–8:00 | README, vidéo plan B, soumission | Livrables §8 |
 
 ### Points de décision
 | Moment | Question | Si non |
@@ -148,4 +149,5 @@ Tester aussi les tentatives de contournement des consignes. Afficher « X / N ac
 | 4 | Chat validé sur le Pixel : streaming fluide, température OK, historique persistant | Test utilisateur (mode avion à confirmer à l'étape 7) |
 | 5 | Vision validée sur le Pixel (photo appareil + galerie, description correcte avec E2B/CPU) | Test utilisateur ; cas d'usage de démo à choisir |
 | 6 | Skills considérés validés (non testés sur le Pixel : à re-tester : dictée, `loadSkill` auto, repli `/skill` si l'E2B n'appelle pas l'outil) | Demande utilisateur, test différé |
+| 7 | Style rétro, thème clair uniquement, sans couleurs dynamiques. Bleu/vert/orange en fond seulement (contraste < 4,5:1 en texte sur blanc), violet en grands titres/contours | Skill retro-style + accessibilité prioritaire ; android-design (couleurs dynamiques) écarté à la demande de l'utilisateur |
 | 3 | Backend CPU par défaut ; Kotlin 2.4.0 (imposé par LiteRT-LM 0.18.0) | Chargement 0,8 s vs 51,6 s, débit équivalent, moins de mémoire (voir `docs/MESURES.md`) |
